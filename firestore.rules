@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// 🔒 Solo vosotros dos podéis leer o escribir.
+// ⚠️ Cambia estos emails por los vuestros (los mismos que en VITE_NITA_EMAIL / VITE_KITOS_EMAIL).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isCouple() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in [
+          'nita@gmail.com',
+          'kitos@gmail.com'
+        ];
+    }
+
+    function isValidPlan(p) {
+      return p.title is string
+        && p.title.size() > 0 && p.title.size() <= 200
+        && p.assignee in ['nita', 'kitos', 'both']
+        && p.priority in ['low', 'medium', 'high', 'urgent']
+        && p.tagIds is list && p.tagIds.size() <= 20
+        && p.done is bool
+        && (p.dueAt == null || p.dueAt is timestamp);
+    }
+
+    function isValidTag(t) {
+      return t.name is string && t.name.size() > 0 && t.name.size() <= 40
+        && t.color is string && t.color.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    match /plans/{planId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple() && isValidPlan(request.resource.data);
+    }
+
+    match /tags/{tagId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple() && isValidTag(request.resource.data);
+    }
+
+    match /config/{docId} {
+      allow read, write: if isCouple();
+    }
+  }
+}

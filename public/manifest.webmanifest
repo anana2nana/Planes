@@ -1,0 +1,12 @@
+{
+  "name": "Nitakitos · Planes",
+  "short_name": "Nitakitos",
+  "description": "Nuestros planes, en tiempo real.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf8f6",
+  "theme_color": "#fdf8f6",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

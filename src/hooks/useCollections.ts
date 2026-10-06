@@ -1,0 +1,102 @@
+import { useEffect, useState } from 'react'
+import { collection, doc, onSnapshot } from 'firebase/firestore'
+import { db } from '../lib/firebase'
+import { DEFAULT_PRIORITIES } from '../lib/colors'
+import type { Plan, PriorityConfig, Tag } from '../lib/types'
+
+export interface SyncState {
+  loading: boolean
+  /** true si los datos vienen de la caché local (sin conexión con el servidor). */
+  offline: boolean
+  /** true mientras hay cambios locales pendientes de subir. */
+  pending: boolean
+  error: string | null
+}
+
+const initialSync: SyncState = { loading: true, offline: false, pending: false, error: null }
+
+/** Planes en tiempo real: cualquier cambio de cualquiera de los dos aparece al instante. */
+export function usePlans() {
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [sync, setSync] = useState<SyncState>(initialSync)
+
+  useEffect(
+    () =>
+      onSnapshot(
+        collection(db, 'plans'),
+        { includeMetadataChanges: true },
+        (snap) => {
+          setPlans(
+            snap.docs.map((d) => {
+              const data = d.data({ serverTimestamps: 'estimate' })
+              return {
+                id: d.id,
+                title: data.title ?? '',
+                notes: data.notes ?? '',
+                assignee: data.assignee ?? 'both',
+                groupId: data.groupId ?? null,
+                dueAt: data.dueAt ?? null,
+                allDay: data.allDay ?? false,
+                priority: data.priority ?? 'medium',
+                tagIds: data.tagIds ?? [],
+                done: data.done ?? false,
+                doneAt: data.doneAt ?? null,
+                doneBy: data.doneBy ?? null,
+                createdBy: data.createdBy ?? 'nita',
+                createdAt: data.createdAt ?? null,
+                updatedAt: data.updatedAt ?? null,
+              } satisfies Plan
+            }),
+          )
+          setSync({
+            loading: false,
+            offline: snap.metadata.fromCache,
+            pending: snap.metadata.hasPendingWrites,
+            error: null,
+          })
+        },
+        (err) => setSync((s) => ({ ...s, loading: false, error: err.message })),
+      ),
+    [],
+  )
+
+  return { plans, sync }
+}
+
+export function useTags() {
+  const [tags, setTags] = useState<Tag[]>([])
+
+  useEffect(
+    () =>
+      onSnapshot(collection(db, 'tags'), (snap) => {
+        setTags(
+          snap.docs
+            .map((d) => ({ id: d.id, name: d.get('name') ?? '', color: d.get('color') ?? '#8b5cf6' }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'es')),
+        )
+      }),
+    [],
+  )
+
+  return tags
+}
+
+export function usePriorities(): PriorityConfig {
+  const [config, setConfig] = useState<PriorityConfig>(DEFAULT_PRIORITIES)
+
+  useEffect(
+    () =>
+      onSnapshot(doc(db, 'config', 'priorities'), (snap) => {
+        const data = snap.data() as Partial<PriorityConfig> | undefined
+        setConfig({
+          urgent: { ...DEFAULT_PRIORITIES.urgent, ...data?.urgent },
+          high: { ...DEFAULT_PRIORITIES.high, ...data?.high },
+          medium: { ...DEFAULT_PRIORITIES.medium, ...data?.medium },
+          low: { ...DEFAULT_PRIORITIES.low, ...data?.low },
+        })
+      }),
+    [],
+  )
+
+  return config
+}

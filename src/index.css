@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-cream: #fdf8f6;
+  --color-ink: #2a2233;
+  --color-muted: #8a7f93;
+
+  --color-nita: #f43f5e;
+  --color-nita-soft: #ffe4e8;
+  --color-kitos: #0ea5e9;
+  --color-kitos-soft: #e0f2fe;
+  --color-both: #8b5cf6;
+  --color-both-soft: #ede9fe;
+
+  --animate-sheet-in: sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: fade-in 200ms ease-out;
+  --animate-pop: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  @keyframes sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pop {
+    0% { transform: scale(0.8); }
+    100% { transform: scale(1); }
+  }
+}
+
+:root {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Evita el zoom automático de iOS en inputs (necesita >= 16px) */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0.75rem);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
