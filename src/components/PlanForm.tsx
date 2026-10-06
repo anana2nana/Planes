@@ -1,14 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { PEOPLE } from '../lib/people'
-import { dateToDraft } from '../lib/time'
+import { dateToDraft, formatDue } from '../lib/time'
+import { DAY_NAME, DAY_SHORT, WEEK_ORDER, describeRepeat, firstOccurrence, nextOccurrence, type Weekday } from '../lib/recurrence'
 import { createPlan, deletePlans, updatePlan } from '../services/plans'
 import type { Plan, PersonId, PlanDraft, PriorityConfig, Tag } from '../lib/types'
 import { BottomSheet } from './BottomSheet'
-import { CalendarIcon, CopyIcon, FlagIcon, NoteIcon, TagIcon, TrashIcon, UsersIcon } from './Icons'
+import { CalendarIcon, CopyIcon, FlagIcon, NoteIcon, RepeatIcon, TagIcon, TrashIcon, UsersIcon } from './Icons'
 import { AssigneePicker, PriorityPicker, TagPicker } from './Pickers'
 
 interface Props {
   plan: Plan | null
+  /** Fecha (yyyy-mm-dd) para un plan nuevo, p. ej. al crearlo desde el calendario. */
+  defaultDate?: string
   siblings: Plan[]
   me: PersonId
   tags: Tag[]
@@ -17,9 +20,9 @@ interface Props {
   onError: (msg: string) => void
 }
 
-function initialDraft(plan: Plan | null): PlanDraft {
+function initialDraft(plan: Plan | null, defaultDate?: string): PlanDraft {
   if (!plan) {
-    return { title: '', notes: '', mode: 'both', dueDate: '', dueTime: '', priority: 'medium', tagIds: [] }
+    return { title: '', notes: '', mode: 'both', dueDate: defaultDate ?? '', dueTime: '', priority: 'medium', tagIds: [], repeatDays: [] }
   }
   return {
     title: plan.title,
@@ -28,6 +31,7 @@ function initialDraft(plan: Plan | null): PlanDraft {
     ...dateToDraft(plan.dueAt?.toDate() ?? null, plan.allDay),
     priority: plan.priority,
     tagIds: plan.tagIds,
+    repeatDays: plan.repeatDays ?? [],
   }
 }
 
@@ -47,8 +51,8 @@ function quickDates() {
   ]
 }
 
-export function PlanForm({ plan, siblings, me, tags, priorities, onClose, onError }: Props) {
-  const [draft, setDraft] = useState<PlanDraft>(() => initialDraft(plan))
+export function PlanForm({ plan, defaultDate, siblings, me, tags, priorities, onClose, onError }: Props) {
+  const [draft, setDraft] = useState<PlanDraft>(() => initialDraft(plan, defaultDate))
   const [confirmDelete, setConfirmDelete] = useState(false)
   const set = <K extends keyof PlanDraft>(k: K, v: PlanDraft[K]) => setDraft((d) => ({ ...d, [k]: v }))
 
@@ -197,6 +201,21 @@ export function PlanForm({ plan, siblings, me, tags, priorities, onClose, onErro
           {draft.dueDate && !draft.dueTime && <p className="mt-1.5 text-xs text-muted">Sin hora: vence al final del día.</p>}
         </Field>
 
+        <Field icon={<RepeatIcon className="size-4" />} label="Repetir">
+          <RepeatPicker
+            days={draft.repeatDays}
+            dueDate={draft.dueDate}
+            dueTime={draft.dueTime}
+            onChange={(days) =>
+              setDraft((d) => {
+                // Si se repite y aún no tiene fecha, empieza el primer día que toque.
+                const first = days.length && !d.dueDate ? firstOccurrence(days) : null
+                return { ...d, repeatDays: days, dueDate: first ? dateToDraft(first, true).dueDate : d.dueDate }
+              })
+            }
+          />
+        </Field>
+
         <Field icon={<FlagIcon className="size-4" />} label="Prioridad">
           <PriorityPicker value={draft.priority} onChange={(p) => set('priority', p)} priorities={priorities} />
         </Field>
@@ -216,6 +235,64 @@ export function PlanForm({ plan, siblings, me, tags, priorities, onClose, onErro
         </Field>
       </form>
     </BottomSheet>
+  )
+}
+
+const PRESETS: { label: string; days: number[] }[] = [
+  { label: 'No se repite', days: [] },
+  { label: 'Todos los días', days: [0, 1, 2, 3, 4, 5, 6] },
+  { label: 'Entre semana', days: [1, 2, 3, 4, 5] },
+  { label: 'Fines de semana', days: [0, 6] },
+]
+
+const sameDays = (a: number[], b: number[]) => a.length === b.length && a.every((d) => b.includes(d))
+
+function RepeatPicker({ days, dueDate, dueTime, onChange }: { days: number[]; dueDate: string; dueTime: string; onChange: (d: number[]) => void }) {
+  const toggle = (d: number) => onChange(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])
+  const due = dueDate ? new Date(`${dueDate}T${dueTime || '23:59'}`) : null
+  const next = due && days.length ? nextOccurrence(due, days, due) : null
+  return (
+    <div className="space-y-3">
+      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5">
+        {PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => onChange(p.days)}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${
+              sameDays(days, p.days) ? 'bg-ink text-white' : 'bg-stone-100 text-ink'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5" role="group" aria-label="Días que se repite">
+        {WEEK_ORDER.map((d: Weekday) => {
+          const active = days.includes(d)
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => toggle(d)}
+              aria-pressed={active}
+              aria-label={DAY_NAME[d]}
+              className={`grid aspect-square place-items-center rounded-full text-sm font-bold transition active:scale-90 ${
+                active ? 'bg-both text-white shadow-md shadow-violet-500/30' : 'bg-stone-100 text-muted'
+              }`}
+            >
+              {DAY_SHORT[d]}
+            </button>
+          )
+        })}
+      </div>
+      {days.length > 0 && (
+        <p className="text-xs text-muted">
+          <b className="text-ink">{describeRepeat(days)}</b>
+          {next && ` · al completarlo aparecerá el siguiente (${formatDue(next, !dueTime).toLowerCase()})`}
+        </p>
+      )}
+    </div>
   )
 }
 

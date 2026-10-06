@@ -60,3 +60,9 @@ export const UsersIcon = (p: P) => (
 export const BellIcon = (p: P) => (
   <svg {...base} {...p}><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15L6 16zM10 21h4" /></svg>
 )
+export const RepeatIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M17 2l3 3-3 3M4 11V9a4 4 0 014-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 01-4 4H4" /></svg>
+)
+export const ChevronIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M9 6l6 6-6 6" /></svg>
+)

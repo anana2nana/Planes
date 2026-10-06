@@ -44,6 +44,7 @@ function toPlan(snap: DocumentSnapshot): PlanData | null {
     doneBy: d.doneBy ?? null,
     createdBy: d.createdBy ?? 'nita',
     remindersSent: d.remindersSent ?? [],
+    spawnedFrom: d.spawnedFrom ?? null,
   }
 }
 

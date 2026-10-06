@@ -15,6 +15,12 @@ export interface Plan {
   assignee: Assignee
   /** Si es una tarea duplicada, ambas copias comparten este id. */
   groupId: string | null
+  /** Días de la semana en que se repite (0 = domingo … 6 = sábado), o null. */
+  repeatDays: number[] | null
+  /** Común a todas las repeticiones de un mismo plan. */
+  seriesId: string | null
+  /** Repetición anterior de la que se creó este plan al completarla. */
+  spawnedFrom: string | null
   dueAt: Timestamp | null
   /** true = solo cuenta el día (vence a las 23:59). */
   allDay: boolean
@@ -50,6 +56,8 @@ export interface PlanDraft {
   dueTime: string // hh:mm o ''
   priority: PriorityId
   tagIds: string[]
+  /** Días en que se repite; vacío = no se repite. */
+  repeatDays: number[]
 }
 
 /** Preferencias de notificación de cada persona (config/notifications). */

@@ -20,6 +20,8 @@ export interface PlanData {
   doneBy: Person | null
   createdBy: Person
   remindersSent: string[]
+  /** Si es la siguiente repetición creada automáticamente al completar la anterior. */
+  spawnedFrom: string | null
 }
 
 export interface NotifPrefs {
@@ -89,7 +91,9 @@ export function activityPushes(before: PlanData | null, after: PlanData | null, 
   if (!after) return []
 
   // Plan nuevo: avisar a la pareja si le afecta.
+  // (La siguiente repetición de un plan que se repite no es un plan "nuevo".)
   if (!before) {
+    if (after.spawnedFrom) return []
     const actor = after.createdBy
     const partner = partnerOf(actor)
     if (!targetsOf(after.assignee).includes(partner)) return []

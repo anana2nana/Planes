@@ -2,7 +2,8 @@ import { PEOPLE } from '../lib/people'
 import type { Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { DueChip } from './Countdown'
-import { CheckIcon, CopyIcon, NoteIcon } from './Icons'
+import { CheckIcon, CopyIcon, NoteIcon, RepeatIcon } from './Icons'
+import { describeRepeat } from '../lib/recurrence'
 import { TagChip } from './TagChip'
 
 interface Props {
@@ -55,6 +56,12 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
             {priority.label}
           </span>
           {plan.dueAt && <DueChip due={plan.dueAt.toDate()} allDay={plan.allDay} done={plan.done} />}
+          {plan.repeatDays && !plan.done && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+              <RepeatIcon className="size-3" />
+              {describeRepeat(plan.repeatDays)}
+            </span>
+          )}
           {plan.groupId && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
               <CopyIcon className="size-3" />

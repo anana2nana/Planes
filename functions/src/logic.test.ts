@@ -15,6 +15,7 @@ const plan = (o: Partial<PlanData> = {}): PlanData => ({
   doneBy: null,
   createdBy: 'nita',
   remindersSent: [],
+  spawnedFrom: null,
   ...o,
 })
 const prefs = { nita: DEFAULT_PREFS, kitos: DEFAULT_PREFS }
@@ -47,6 +48,15 @@ test('completar avisa a la pareja de quien lo completa', () => {
   const r = activityPushes(plan(), plan({ done: true, doneBy: 'kitos' }), NOW)
   assert.equal(r[0].to, 'nita')
   assert.match(r[0].title, /Kitos ha completado un plan/)
+})
+
+test('la siguiente repetición automática no avisa como plan nuevo', () => {
+  assert.deepEqual(activityPushes(null, plan({ assignee: 'kitos', spawnedFrom: 'p0' }), NOW), [])
+})
+
+test('completar una repetición sí avisa', () => {
+  const r = activityPushes(plan({ spawnedFrom: 'p0' }), plan({ spawnedFrom: 'p0', done: true, doneBy: 'nita' }), NOW)
+  assert.equal(r[0].to, 'kitos')
 })
 
 test('editar o borrar no genera avisos', () => {

@@ -6,11 +6,13 @@ import { isFirebaseConfigured } from './lib/firebase'
 import { PEOPLE } from './lib/people'
 import { refreshPush } from './lib/push'
 import { toggleDone } from './services/plans'
+import { formatDue } from './lib/time'
 import type { Plan, PersonId } from './lib/types'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
-import { CloudOffIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
+import { CalendarIcon, CloudOffIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
+import { CalendarView } from './components/CalendarView'
 import { PlanForm } from './components/PlanForm'
 import { PlansView } from './components/PlansView'
 import { SettingsView } from './components/SettingsView'
@@ -24,8 +26,8 @@ export default function App() {
   return <Home user={auth.user} me={auth.me} />
 }
 
-type Tab = 'plans' | 'settings'
-type Sheet = { mode: 'new' } | { mode: 'edit'; id: string } | null
+type Tab = 'plans' | 'calendar' | 'settings'
+type Sheet = { mode: 'new'; date?: string } | { mode: 'edit'; id: string } | null
 
 function greeting() {
   const h = new Date().getHours()
@@ -56,9 +58,11 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   const onToggle = useCallback(
     (plan: Plan) => {
       navigator.vibrate?.(10)
-      toggleDone(plan, me).catch((e: Error) => setToast(e.message))
+      const { next, committed } = toggleDone(plan, me, plans)
+      committed.catch((e: Error) => setToast(e.message))
+      if (next) setToast(`¡Hecho! ✓ Se repite: ${formatDue(next, plan.allDay).toLowerCase()}`)
     },
-    [me],
+    [me, plans],
   )
   // La hoja de edición ocupa una entrada del historial, así el gesto/botón
   // "atrás" de Android la cierra en vez de salir de la app.
@@ -104,7 +108,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">{tab === 'plans' ? `${greeting()},` : 'Vuestro espacio'}</p>
             <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">
-              {tab === 'plans' ? PEOPLE[me].name : 'Ajustes'}
+              {tab === 'plans' ? PEOPLE[me].name : tab === 'calendar' ? 'Calendario' : 'Ajustes'}
             </h1>
           </div>
           <SyncBadge offline={sync.offline && !sync.loading} pending={sync.pending} />
@@ -123,31 +127,47 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
           />
+        ) : tab === 'calendar' ? (
+          <CalendarView
+            plans={plans}
+            me={me}
+            tags={tags}
+            priorities={priorities}
+            onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
+            onToggle={onToggle}
+            onCreate={(date) => openSheet({ mode: 'new', date })}
+          />
         ) : (
           <SettingsView user={user} me={me} tags={tags} plans={plans} priorities={priorities} onError={setToast} />
         )}
         </ErrorBoundary>
       </main>
 
-      {/* Barra inferior + botón de crear */}
+      {/* Botón de crear (flotante, abajo a la derecha, como en las apps de Android) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
+        <button
+          onClick={() => openSheet({ mode: 'new' })}
+          aria-label="Nuevo plan"
+          className="pointer-events-auto grid size-16 place-items-center rounded-[22px] bg-gradient-to-br from-nita via-both to-kitos text-white shadow-xl shadow-violet-500/30 transition active:scale-90"
+        >
+          <PlusIcon className="size-7" strokeWidth={2.5} />
+        </button>
+      </div>
+
+      {/* Barra inferior */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-white/85 backdrop-blur-xl">
-        <div className="relative mx-auto grid max-w-lg grid-cols-2 px-6 pt-2">
+        <div className="mx-auto grid max-w-lg grid-cols-3 px-4 pt-2">
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
+          <NavButton active={tab === 'calendar'} onClick={() => setTab('calendar')} icon={<CalendarIcon className="size-6" />} label="Calendario" />
           <NavButton active={tab === 'settings'} onClick={() => setTab('settings')} icon={<SlidersIcon className="size-6" />} label="Ajustes" />
-          <button
-            onClick={() => openSheet({ mode: 'new' })}
-            aria-label="Nuevo plan"
-            className="absolute -top-7 left-1/2 grid size-16 -translate-x-1/2 place-items-center rounded-full bg-gradient-to-br from-nita via-both to-kitos text-white shadow-xl shadow-violet-500/30 ring-4 ring-cream transition active:scale-90"
-          >
-            <PlusIcon className="size-7" strokeWidth={2.5} />
-          </button>
         </div>
       </nav>
 
       {sheet && (sheet.mode === 'new' || editing) && (
         <PlanForm
-          key={sheet.mode === 'edit' ? sheet.id : 'new'}
+          key={sheet.mode === 'edit' ? sheet.id : `new-${sheet.date ?? ''}`}
           plan={editing}
+          defaultDate={sheet.mode === 'new' ? sheet.date : undefined}
           siblings={siblings}
           me={me}
           tags={tags}
@@ -158,7 +178,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       )}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-28 z-[60] mx-auto max-w-sm animate-fade-in rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-xl" role="alert">
+        <div className="fixed inset-x-4 bottom-44 z-[60] mx-auto max-w-sm animate-fade-in rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-xl" role="alert">
           {toast}
         </div>
       )}
@@ -170,11 +190,10 @@ function NavButton({ active, onClick, icon, label }: { active: boolean; onClick:
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-0.5 py-1 text-[11px] font-bold transition ${active ? 'text-ink' : 'text-stone-400'} ${
-        label === 'Planes' ? 'justify-self-start' : 'justify-self-end'
-      }`}
+      aria-current={active ? 'page' : undefined}
+      className={`flex flex-col items-center gap-1 py-1 text-[11px] font-bold transition ${active ? 'text-ink' : 'text-stone-400'}`}
     >
-      {icon}
+      <span className={`grid h-8 w-14 place-items-center rounded-full transition ${active ? 'bg-both-soft text-both' : ''}`}>{icon}</span>
       {label}
     </button>
   )

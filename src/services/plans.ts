@@ -9,13 +9,17 @@ import {
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { partnerOf } from '../lib/people'
+import { dayKey, nextOccurrence } from '../lib/recurrence'
 import { draftToDate } from '../lib/time'
 import type { Assignee, NotifPrefs, Plan, PersonId, PlanDraft, PriorityConfig, PriorityId, Tag } from '../lib/types'
 
 const plansCol = collection(db, 'plans')
 
-function sharedFields(draft: PlanDraft) {
+const newId = () => doc(plansCol).id
+
+function sharedFields(draft: PlanDraft, seriesId: string | null) {
   const { date, allDay } = draftToDate(draft.dueDate, draft.dueTime)
+  const repeats = draft.repeatDays.length > 0 && date !== null
   return {
     title: draft.title.trim(),
     notes: draft.notes.trim(),
@@ -23,6 +27,8 @@ function sharedFields(draft: PlanDraft) {
     allDay,
     priority: draft.priority,
     tagIds: draft.tagIds,
+    repeat: repeats ? { days: [...draft.repeatDays].sort() } : null,
+    seriesId: repeats ? (seriesId ?? newId()) : seriesId,
   }
 }
 
@@ -34,7 +40,8 @@ function sharedFields(draft: PlanDraft) {
 export async function createPlan(draft: PlanDraft, me: PersonId) {
   const batch = writeBatch(db)
   const base = {
-    ...sharedFields(draft),
+    ...sharedFields(draft, null),
+    spawnedFrom: null,
     done: false,
     doneAt: null,
     doneBy: null,
@@ -61,7 +68,7 @@ export async function createPlan(draft: PlanDraft, me: PersonId) {
  */
 export async function updatePlan(plan: Plan, draft: PlanDraft, siblings: Plan[]) {
   const batch = writeBatch(db)
-  const shared = { ...sharedFields(draft), updatedAt: serverTimestamp() }
+  const shared = { ...sharedFields(draft, plan.seriesId), updatedAt: serverTimestamp() }
   const ref = doc(plansCol, plan.id)
 
   if (plan.groupId) {
@@ -82,6 +89,7 @@ export async function updatePlan(plan: Plan, draft: PlanDraft, siblings: Plan[])
       doneBy: null,
       createdBy: plan.createdBy,
       createdAt: serverTimestamp(),
+      spawnedFrom: null,
     })
   } else {
     batch.update(ref, { ...shared, assignee: draft.mode as Assignee })
@@ -90,7 +98,12 @@ export async function updatePlan(plan: Plan, draft: PlanDraft, siblings: Plan[])
   await batch.commit()
 }
 
-export async function toggleDone(plan: Plan, me: PersonId) {
+/**
+ * Marca/desmarca un plan como hecho. Si se repite y se completa, crea la
+ * siguiente repetición (salvo que ya exista, p. ej. si se desmarcó y se volvió a marcar).
+ * Devuelve al instante la fecha de la siguiente repetición, si la hay.
+ */
+export function toggleDone(plan: Plan, me: PersonId, allPlans: Plan[]): { next: Date | null; committed: Promise<void> } {
   const batch = writeBatch(db)
   const done = !plan.done
   batch.update(doc(plansCol, plan.id), {
@@ -99,7 +112,37 @@ export async function toggleDone(plan: Plan, me: PersonId) {
     doneBy: done ? me : null,
     updatedAt: serverTimestamp(),
   })
-  await batch.commit()
+
+  let next: Date | null = null
+  const alreadySpawned = allPlans.some((p) => p.spawnedFrom === plan.id)
+  if (done && plan.repeatDays && plan.dueAt && !alreadySpawned) {
+    next = nextOccurrence(plan.dueAt.toDate(), plan.repeatDays)
+    if (next) {
+      const seriesId = plan.seriesId ?? newId()
+      batch.set(doc(plansCol), {
+        title: plan.title,
+        notes: plan.notes,
+        assignee: plan.assignee,
+        // Las dos copias de un duplicado calculan el mismo id para la misma fecha.
+        groupId: plan.groupId ? `${seriesId}_${dayKey(next)}` : null,
+        dueAt: Timestamp.fromDate(next),
+        allDay: plan.allDay,
+        priority: plan.priority,
+        tagIds: plan.tagIds,
+        repeat: { days: plan.repeatDays },
+        seriesId,
+        spawnedFrom: plan.id,
+        done: false,
+        doneAt: null,
+        doneBy: null,
+        createdBy: plan.createdBy,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    }
+  }
+
+  return { next, committed: batch.commit() }
 }
 
 export async function deletePlans(ids: string[]) {
