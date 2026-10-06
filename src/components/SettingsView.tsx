@@ -9,6 +9,7 @@ import { Avatar } from './Avatar'
 import { ColorPicker } from './ColorPicker'
 import { LogoutIcon, PlusIcon, TrashIcon } from './Icons'
 import { NotificationsSection } from './NotificationsSection'
+import { ErrorBoundary } from './ErrorBoundary'
 
 interface Props {
   user: User
@@ -26,7 +27,9 @@ export function SettingsView({ user, me, tags, plans, priorities, onError }: Pro
   return (
     <div className="space-y-8">
       <Section title="Notificaciones" hint="Cada uno las suyas">
-        <NotificationsSection me={me} onError={onError} />
+        <ErrorBoundary inline>
+          <NotificationsSection me={me} onError={onError} />
+        </ErrorBoundary>
       </Section>
 
       <Section title="Prioridades" hint="Toca el color para cambiarlo">

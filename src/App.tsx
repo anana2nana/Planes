@@ -8,6 +8,7 @@ import { refreshPush } from './lib/push'
 import { toggleDone } from './services/plans'
 import type { Plan, PersonId } from './lib/types'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
 import { CloudOffIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
 import { PlanForm } from './components/PlanForm'
@@ -107,6 +108,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       </header>
 
       <main className="px-4 pb-36 pt-2">
+        <ErrorBoundary inline key={tab}>
         {tab === 'plans' ? (
           <PlansView
             plans={plans}
@@ -120,6 +122,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
         ) : (
           <SettingsView user={user} me={me} tags={tags} plans={plans} priorities={priorities} onError={setToast} />
         )}
+        </ErrorBoundary>
       </main>
 
       {/* Barra inferior + botón de crear */}
