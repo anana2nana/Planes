@@ -58,7 +58,31 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     },
     [me],
   )
-  const closeSheet = useCallback(() => setSheet(null), [])
+  // La hoja de edición ocupa una entrada del historial, así el gesto/botón
+  // "atrás" de Android la cierra en vez de salir de la app.
+  const openSheet = useCallback((s: Exclude<Sheet, null>) => {
+    if (!history.state?.sheet) history.pushState({ sheet: true }, '')
+    setSheet(s)
+  }, [])
+  const closeSheet = useCallback(() => {
+    if (history.state?.sheet) history.back() // el popstate de abajo la cierra
+    else setSheet(null)
+  }, [])
+
+  useEffect(() => {
+    const onPop = () => {
+      if (!history.state?.sheet) setSheet(null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  // Acceso directo "Nuevo plan" (mantener pulsado el icono de la app en Android).
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has('nuevo')) return
+    history.replaceState(null, '', '/')
+    openSheet({ mode: 'new' })
+  }, [openSheet])
 
   useEffect(() => window.scrollTo({ top: 0 }), [tab])
 
@@ -85,7 +109,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             tags={tags}
             priorities={priorities}
             loading={sync.loading}
-            onOpen={(p) => setSheet({ mode: 'edit', id: p.id })}
+            onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
           />
         ) : (
@@ -99,7 +123,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
           <NavButton active={tab === 'settings'} onClick={() => setTab('settings')} icon={<SlidersIcon className="size-6" />} label="Ajustes" />
           <button
-            onClick={() => setSheet({ mode: 'new' })}
+            onClick={() => openSheet({ mode: 'new' })}
             aria-label="Nuevo plan"
             className="absolute -top-7 left-1/2 grid size-16 -translate-x-1/2 place-items-center rounded-full bg-gradient-to-br from-nita via-both to-kitos text-white shadow-xl shadow-violet-500/30 ring-4 ring-cream transition active:scale-90"
           >

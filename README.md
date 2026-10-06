@@ -11,7 +11,7 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Fechas tope y cuenta atrás en vivo**: los planes de los próximos 7 días muestran cuenta atrás al segundo; el más cercano sale destacado en grande. Agrupados en *Vencidos / Próximos 7 días / Más adelante / Sin fecha*.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
 - **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI).
-- Instalable en la pantalla de inicio (manifest + icono).
+- **Pensada para Android (Pixel)**: se instala como app desde Chrome con icono adaptable, el gesto/botón *atrás* cierra el formulario en vez de salir, el teclado no tapa los campos, vibración al completar y acceso directo **Nuevo plan** manteniendo pulsado el icono.
 
 ## 🚀 Puesta en marcha (≈10 min)
 
@@ -33,7 +33,7 @@ cp .env.example .env.local   # rellena las claves de Firebase y vuestros emails
 npm run dev                   # http://localhost:5173
 ```
 
-Para probarlo desde el móvil en la misma wifi: `npm run dev -- --host` y abre la IP que aparezca.
+Para probarlo desde el móvil en la misma wifi: `npm run dev -- --host` y abre en Chrome la IP que aparezca (para *instalarla* hace falta HTTPS, así que eso ya con la URL de Vercel).
 
 ### 3. Despliegue en Vercel
 
@@ -41,7 +41,7 @@ Para probarlo desde el móvil en la misma wifi: `npm run dev -- --host` y abre l
 2. En **Environment Variables** añade las mismas variables que en `.env.local` (todas las `VITE_…`, excepto `VITE_USE_EMULATORS`).
 3. **Deploy**.
 4. Vuelve a Firebase → **Authentication → Configuración → Dominios autorizados** → añade tu dominio de Vercel (`tu-app.vercel.app`). Sin esto el login con Google falla.
-5. En el móvil, abre la URL → *Compartir → Añadir a pantalla de inicio* (iOS) o *Instalar app* (Android).
+5. Instalarla en los Pixel: abre la URL en **Chrome** → menú ⋮ → **Instalar app** (o acepta el aviso "Instalar" que aparece abajo). Queda en el cajón de apps con su icono, se abre a pantalla completa sin barra del navegador, y si mantienes pulsado el icono tienes el atajo **Nuevo plan**.
 
 ## 🧪 Probar sin tocar Firebase real (opcional)
 

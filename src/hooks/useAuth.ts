@@ -30,8 +30,7 @@ export async function login() {
   try {
     await signInWithPopup(auth, googleProvider)
   } catch (e) {
-    // Algunos navegadores (p. ej. la app instalada en la pantalla de inicio de iOS)
-    // bloquean las ventanas emergentes: en ese caso usamos redirección.
+    // Si el navegador bloquea la ventana emergente, usamos redirección.
     const code = (e as { code?: string }).code
     if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
       await signInWithRedirect(auth, googleProvider)
