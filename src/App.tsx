@@ -86,7 +86,11 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     openSheet({ mode: 'new' })
   }, [openSheet])
 
-  useEffect(() => window.scrollTo({ top: 0 }), [tab])
+  // Con llaves: en Chrome reciente scrollTo devuelve una promesa, y si el efecto
+  // la devolviera React la trataría como función de limpieza y fallaría.
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [tab])
 
   useEffect(() => {
     refreshPush(me)
