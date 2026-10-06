@@ -35,12 +35,12 @@ Las envían unas Cloud Functions (`functions/`): una salta cuando cambia un plan
 
 1. **Plan Blaze**: las Cloud Functions lo requieren (*Firebase → ⚙️ → Uso y facturación → Cambiar plan*). Pide tarjeta, pero para dos personas el uso queda muy por debajo de la capa gratuita (≈8.600 ejecuciones/mes de 2 millones gratis). Recomendado: crea una **alerta de presupuesto** de 1 € en ese mismo panel.
 2. **Clave VAPID**: *⚙️ Configuración del proyecto → Cloud Messaging → Configuración web → Certificados push web → Generar par de claves*. Copia la clave en `VITE_FIREBASE_VAPID_KEY`.
-3. **Desplegar** funciones, reglas e índice (te pedirá vuestros dos emails la primera vez y los guarda en `functions/.env.<proyecto>`):
+3. **Desplegar** las funciones y el índice (te pedirá vuestros dos emails la primera vez y los guarda en `functions/.env.<proyecto>`). No incluyas `firestore:rules` salvo que `firestore.rules` tenga ya vuestros emails, o sobrescribirá las reglas publicadas:
 
    ```bash
    npm --prefix functions install
    npx firebase-tools login
-   npx firebase-tools deploy --only functions,firestore --project TU_PROJECT_ID
+   npx firebase-tools deploy --only functions,firestore:indexes --project TU_PROJECT_ID
    ```
 
 4. En cada móvil: *Ajustes → Notificaciones → Activar* → permitir → **Enviarme una notificación de prueba**.
