@@ -10,7 +10,7 @@ import {
 import { db } from '../lib/firebase'
 import { partnerOf } from '../lib/people'
 import { draftToDate } from '../lib/time'
-import type { Assignee, Plan, PersonId, PlanDraft, PriorityConfig, PriorityId, Tag } from '../lib/types'
+import type { Assignee, NotifPrefs, Plan, PersonId, PlanDraft, PriorityConfig, PriorityId, Tag } from '../lib/types'
 
 const plansCol = collection(db, 'plans')
 
@@ -135,5 +135,13 @@ export async function deleteTag(tagId: string, plans: Plan[]) {
 export async function savePriority(id: PriorityId, config: PriorityConfig[PriorityId]) {
   const batch = writeBatch(db)
   batch.set(doc(db, 'config', 'priorities'), { [id]: config }, { merge: true })
+  await batch.commit()
+}
+
+// ─── Notificaciones ─────────────────────────────────────────────────────────
+
+export async function saveNotifPrefs(person: PersonId, prefs: NotifPrefs) {
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'config', 'notifications'), { [person]: prefs }, { merge: true })
   await batch.commit()
 }

@@ -51,3 +51,13 @@ export interface PlanDraft {
   priority: PriorityId
   tagIds: string[]
 }
+
+/** Preferencias de notificación de cada persona (config/notifications). */
+export interface NotifPrefs {
+  /** Avisarme cuando mi pareja crea un plan para mí o completa uno. */
+  activity: boolean
+  /** Recordatorios antes de la fecha tope. */
+  reminders: boolean
+  /** Minutos de antelación (0 = a la hora). */
+  leads: number[]
+}

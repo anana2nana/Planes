@@ -57,3 +57,6 @@ export const CalendarIcon = (p: P) => (
 export const UsersIcon = (p: P) => (
   <svg {...base} {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.5a3.5 3.5 0 010 7M18 14a6 6 0 013.5 6" /></svg>
 )
+export const BellIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15L6 16zM10 21h4" /></svg>
+)

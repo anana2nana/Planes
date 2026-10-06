@@ -39,6 +39,14 @@ service cloud.firestore {
       allow create, update: if isCouple() && isValidTag(request.resource.data);
     }
 
+    // Un documento por móvil con notificaciones activadas (id = token de FCM).
+    match /devices/{token} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.person in ['nita', 'kitos']
+        && request.resource.data.token == token;
+    }
+
     match /config/{docId} {
       allow read, write: if isCouple();
     }

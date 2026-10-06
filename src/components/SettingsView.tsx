@@ -8,6 +8,7 @@ import type { PersonId, Plan, PriorityConfig, PriorityId, Tag } from '../lib/typ
 import { Avatar } from './Avatar'
 import { ColorPicker } from './ColorPicker'
 import { LogoutIcon, PlusIcon, TrashIcon } from './Icons'
+import { NotificationsSection } from './NotificationsSection'
 
 interface Props {
   user: User
@@ -24,6 +25,10 @@ export function SettingsView({ user, me, tags, plans, priorities, onError }: Pro
 
   return (
     <div className="space-y-8">
+      <Section title="Notificaciones" hint="Cada uno las suyas">
+        <NotificationsSection me={me} onError={onError} />
+      </Section>
+
       <Section title="Prioridades" hint="Toca el color para cambiarlo">
         {PRIORITY_ORDER.map((id) => (
           <PriorityRow

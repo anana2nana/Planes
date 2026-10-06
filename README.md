@@ -2,7 +2,7 @@
 
 App web móvil, privada y colaborativa en tiempo real para gestionar nuestros planes en pareja.
 
-**Stack:** Vite + React 19 + TypeScript · Tailwind CSS v4 · Firebase (Auth con Google + Firestore en tiempo real) · Despliegue en Vercel.
+**Stack:** Vite + React 19 + TypeScript · Tailwind CSS v4 · Firebase (Auth con Google + Firestore en tiempo real + Cloud Functions + Cloud Messaging) · Despliegue en Vercel.
 
 ## ✨ Qué hace
 
@@ -11,6 +11,10 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Fechas tope y cuenta atrás en vivo**: los planes de los próximos 7 días muestran cuenta atrás al segundo; el más cercano sale destacado en grande. Agrupados en *Vencidos / Próximos 7 días / Más adelante / Sin fecha*.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
 - **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI).
+- **Notificaciones push** (también con la app cerrada):
+  - cuando el otro te asigna un plan, crea uno para los dos o completa algo;
+  - recordatorios antes de la fecha tope (a la hora, 15 min, 1 h, 3 h, 1 día: cada uno elige los suyos en *Ajustes*);
+  - si la app está abierta delante, no se avisa de la actividad (ya se ve en vivo); los recordatorios siempre llegan.
 - **Pensada para Android (Pixel)**: se instala como app desde Chrome con icono adaptable, el gesto/botón *atrás* cierra el formulario en vez de salir, el teclado no tapa los campos, vibración al completar y acceso directo **Nuevo plan** manteniendo pulsado el icono.
 
 ## 🚀 Puesta en marcha (≈10 min)
@@ -25,7 +29,25 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
    - Consola: *Firestore → Reglas* → pega el contenido del archivo → **Publicar**.
    - CLI: `npx firebase-tools login` y `npx firebase-tools deploy --only firestore:rules --project TU_PROJECT_ID`.
 
-### 2. Local
+### 2. Notificaciones push
+
+Las envían unas Cloud Functions (`functions/`): una salta cuando cambia un plan y otra revisa cada 5 minutos si toca algún recordatorio.
+
+1. **Plan Blaze**: las Cloud Functions lo requieren (*Firebase → ⚙️ → Uso y facturación → Cambiar plan*). Pide tarjeta, pero para dos personas el uso queda muy por debajo de la capa gratuita (≈8.600 ejecuciones/mes de 2 millones gratis). Recomendado: crea una **alerta de presupuesto** de 1 € en ese mismo panel.
+2. **Clave VAPID**: *⚙️ Configuración del proyecto → Cloud Messaging → Configuración web → Certificados push web → Generar par de claves*. Copia la clave en `VITE_FIREBASE_VAPID_KEY`.
+3. **Desplegar** funciones, reglas e índice (te pedirá vuestros dos emails la primera vez y los guarda en `functions/.env.<proyecto>`):
+
+   ```bash
+   npm --prefix functions install
+   npx firebase-tools login
+   npx firebase-tools deploy --only functions,firestore --project TU_PROJECT_ID
+   ```
+
+4. En cada móvil: *Ajustes → Notificaciones → Activar* → permitir → **Enviarme una notificación de prueba**.
+
+> Si no llegan: *Ajustes de Android → Apps → Nitakitos → Notificaciones* debe estar activado, y conviene poner la batería de la app en *Sin restricciones* para que los recordatorios no se retrasen.
+
+### 3. Local
 
 ```bash
 npm install
@@ -35,7 +57,7 @@ npm run dev                   # http://localhost:5173
 
 Para probarlo desde el móvil en la misma wifi: `npm run dev -- --host` y abre en Chrome la IP que aparezca (para *instalarla* hace falta HTTPS, así que eso ya con la URL de Vercel).
 
-### 3. Despliegue en Vercel
+### 4. Despliegue en Vercel
 
 1. En <https://vercel.com/new> importa este repo de GitHub. Detecta Vite solo (`npm run build`, salida `dist`).
 2. En **Environment Variables** añade las mismas variables que en `.env.local` (todas las `VITE_…`, excepto `VITE_USE_EMULATORS`).
@@ -45,10 +67,12 @@ Para probarlo desde el móvil en la misma wifi: `npm run dev -- --host` y abre e
 
 ## 🧪 Probar sin tocar Firebase real (opcional)
 
-Con Java instalado puedes usar los emuladores locales:
+Lógica de notificaciones: `npm --prefix functions test`.
+
+Con Java instalado puedes usar los emuladores locales (en el emulador las funciones escriben los avisos en el log en vez de enviarlos):
 
 ```bash
-npx firebase-tools emulators:start --only auth,firestore --project demo-nitakitos
+npx firebase-tools emulators:start --only auth,firestore,functions --project demo-nitakitos
 # en .env.local: VITE_FIREBASE_PROJECT_ID=demo-nitakitos y VITE_USE_EMULATORS=true
 npm run dev
 ```
@@ -70,6 +94,11 @@ src/
     useNow.ts             # Un único reloj compartido para todas las cuentas atrás
   services/plans.ts       # Escrituras (crear/duplicar/editar/completar/borrar, etiquetas, prioridades)
   components/             # PlanCard, NextUp, Countdown, PlanForm, Pickers, SettingsView…
+  lib/push.ts             # Activar/desactivar push en este móvil (token FCM)
+public/sw.js              # Service worker: muestra las notificaciones con la app cerrada
+functions/src/
+  index.ts                # Cloud Functions: avisos de actividad, recordatorios (cada 5 min), prueba
+  logic.ts                # Qué avisar, a quién y cuándo (con tests en logic.test.ts)
 firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de datos
 ```
 
@@ -77,6 +106,8 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 
 | Colección | Campos |
 |---|---|
-| `plans/{id}` | `title, notes, assignee ('nita' \| 'kitos' \| 'both'), groupId (copias duplicadas), dueAt, allDay, priority, tagIds[], done, doneAt, doneBy, createdBy, createdAt, updatedAt` |
+| `plans/{id}` | `title, notes, assignee ('nita' \| 'kitos' \| 'both'), groupId (copias duplicadas), dueAt, allDay, priority, tagIds[], done, doneAt, doneBy, createdBy, createdAt, updatedAt, remindersSent[] (lo gestiona el servidor)` |
 | `tags/{id}` | `name, color` |
 | `config/priorities` | `{ urgent \| high \| medium \| low: { label, color } }` |
+| `config/notifications` | `{ nita \| kitos: { activity, reminders, leads[] } }` |
+| `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |

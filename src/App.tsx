@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 import { usePlans, usePriorities, useTags } from './hooks/useCollections'
 import { isFirebaseConfigured } from './lib/firebase'
 import { PEOPLE } from './lib/people'
+import { refreshPush } from './lib/push'
 import { toggleDone } from './services/plans'
 import type { Plan, PersonId } from './lib/types'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
@@ -85,6 +86,10 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   }, [openSheet])
 
   useEffect(() => window.scrollTo({ top: 0 }), [tab])
+
+  useEffect(() => {
+    refreshPush(me)
+  }, [me])
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg">

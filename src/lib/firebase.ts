@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { connectAuthEmulator, getAuth, GoogleAuthProvider } from 'firebase/auth'
+import { connectFunctionsEmulator, getFunctions } from 'firebase/functions'
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -20,7 +21,7 @@ export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId,
 )
 
-const app = initializeApp(
+export const app = initializeApp(
   isFirebaseConfigured ? firebaseConfig : { apiKey: 'missing', projectId: 'missing', appId: 'missing' },
 )
 
@@ -34,8 +35,12 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 })
 
+// Misma región que las Cloud Functions (functions/src/index.ts).
+export const functions = getFunctions(app, 'europe-west1')
+
 // Opcional: probar en local contra los emuladores (`npx firebase emulators:start`).
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001)
 }

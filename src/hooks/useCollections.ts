@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { DEFAULT_PRIORITIES } from '../lib/colors'
-import type { Plan, PriorityConfig, Tag } from '../lib/types'
+import type { NotifPrefs, PersonId, Plan, PriorityConfig, Tag } from '../lib/types'
 
 export interface SyncState {
   loading: boolean
@@ -99,4 +99,24 @@ export function usePriorities(): PriorityConfig {
   )
 
   return config
+}
+
+export const DEFAULT_NOTIF_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440] }
+
+export function useNotifPrefs(): Record<PersonId, NotifPrefs> {
+  const [prefs, setPrefs] = useState({ nita: DEFAULT_NOTIF_PREFS, kitos: DEFAULT_NOTIF_PREFS })
+
+  useEffect(
+    () =>
+      onSnapshot(doc(db, 'config', 'notifications'), (snap) => {
+        const data = snap.data() as Partial<Record<PersonId, Partial<NotifPrefs>>> | undefined
+        setPrefs({
+          nita: { ...DEFAULT_NOTIF_PREFS, ...data?.nita },
+          kitos: { ...DEFAULT_NOTIF_PREFS, ...data?.kitos },
+        })
+      }),
+    [],
+  )
+
+  return prefs
 }
