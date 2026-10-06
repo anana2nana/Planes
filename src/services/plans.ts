@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { partnerOf } from '../lib/people'
-import { dayKey, nextOccurrence } from '../lib/recurrence'
+import { dayKey, nextOccurrence, type Repeat } from '../lib/recurrence'
 import { draftToDate } from '../lib/time'
 import type { Assignee, NotifPrefs, Plan, PersonId, PlanDraft, PriorityConfig, PriorityId, Tag } from '../lib/types'
 
@@ -17,17 +17,28 @@ const plansCol = collection(db, 'plans')
 
 const newId = () => doc(plansCol).id
 
+function buildRepeat(draft: PlanDraft): Repeat | null {
+  if (draft.repeatYearly) return { days: [], yearly: true, rotate: false }
+  if (draft.repeatDays.length === 0) return null
+  // Los turnos solo tienen sentido en tareas/planes asignados a una persona.
+  const canRotate = draft.kind !== 'event' && (draft.mode === 'nita' || draft.mode === 'kitos')
+  return { days: [...draft.repeatDays].sort(), yearly: false, rotate: draft.rotate && canRotate }
+}
+
 function sharedFields(draft: PlanDraft, seriesId: string | null) {
   const { date, allDay } = draftToDate(draft.dueDate, draft.dueTime)
-  const repeats = draft.repeatDays.length > 0 && date !== null
+  const repeat = date ? buildRepeat(draft) : null
+  const repeats = repeat !== null
   return {
+    kind: draft.kind,
     title: draft.title.trim(),
     notes: draft.notes.trim(),
     dueAt: date ? Timestamp.fromDate(date) : null,
     allDay,
     priority: draft.priority,
     tagIds: draft.tagIds,
-    repeat: repeats ? { days: [...draft.repeatDays].sort() } : null,
+    repeat,
+    remindWeekBefore: draft.kind === 'event' && draft.remindWeekBefore,
     seriesId: repeats ? (seriesId ?? newId()) : seriesId,
   }
 }
@@ -103,7 +114,11 @@ export async function updatePlan(plan: Plan, draft: PlanDraft, siblings: Plan[])
  * siguiente repetición (salvo que ya exista, p. ej. si se desmarcó y se volvió a marcar).
  * Devuelve al instante la fecha de la siguiente repetición, si la hay.
  */
-export function toggleDone(plan: Plan, me: PersonId, allPlans: Plan[]): { next: Date | null; committed: Promise<void> } {
+export function toggleDone(
+  plan: Plan,
+  me: PersonId,
+  allPlans: Plan[],
+): { next: Date | null; nextAssignee: Assignee; committed: Promise<void> } {
   const batch = writeBatch(db)
   const done = !plan.done
   batch.update(doc(plansCol, plan.id), {
@@ -114,22 +129,27 @@ export function toggleDone(plan: Plan, me: PersonId, allPlans: Plan[]): { next: 
   })
 
   let next: Date | null = null
+  let nextAssignee: Assignee = plan.assignee
   const alreadySpawned = allPlans.some((p) => p.spawnedFrom === plan.id)
-  if (done && plan.repeatDays && plan.dueAt && !alreadySpawned) {
-    next = nextOccurrence(plan.dueAt.toDate(), plan.repeatDays)
+  if (done && plan.kind !== 'event' && plan.repeat && plan.dueAt && !alreadySpawned) {
+    next = nextOccurrence(plan.dueAt.toDate(), plan.repeat)
+    // Turnos: la siguiente vez le toca a la otra persona.
+    if (plan.repeat.rotate && plan.assignee !== 'both' && !plan.groupId) nextAssignee = partnerOf(plan.assignee)
     if (next) {
       const seriesId = plan.seriesId ?? newId()
       batch.set(doc(plansCol), {
+        kind: plan.kind,
         title: plan.title,
         notes: plan.notes,
-        assignee: plan.assignee,
+        assignee: nextAssignee,
         // Las dos copias de un duplicado calculan el mismo id para la misma fecha.
         groupId: plan.groupId ? `${seriesId}_${dayKey(next)}` : null,
         dueAt: Timestamp.fromDate(next),
         allDay: plan.allDay,
         priority: plan.priority,
         tagIds: plan.tagIds,
-        repeat: { days: plan.repeatDays },
+        repeat: plan.repeat,
+        remindWeekBefore: plan.remindWeekBefore,
         seriesId,
         spawnedFrom: plan.id,
         done: false,
@@ -142,7 +162,7 @@ export function toggleDone(plan: Plan, me: PersonId, allPlans: Plan[]): { next: 
     }
   }
 
-  return { next, committed: batch.commit() }
+  return { next, nextAssignee, committed: batch.commit() }
 }
 
 export async function deletePlans(ids: string[]) {

@@ -7,11 +7,12 @@ import { PEOPLE } from './lib/people'
 import { refreshPush } from './lib/push'
 import { toggleDone } from './services/plans'
 import { formatDue } from './lib/time'
-import type { Plan, PersonId } from './lib/types'
+import type { Kind, Plan, PersonId } from './lib/types'
+import { KINDS } from './lib/kinds'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
-import { CalendarIcon, CloudOffIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
+import { CalendarIcon, CheckIcon, CloudOffIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
 import { CalendarView } from './components/CalendarView'
 import { PlanForm } from './components/PlanForm'
 import { PlansView } from './components/PlansView'
@@ -26,8 +27,12 @@ export default function App() {
   return <Home user={auth.user} me={auth.me} />
 }
 
-type Tab = 'plans' | 'calendar' | 'settings'
-type Sheet = { mode: 'new'; date?: string } | { mode: 'edit'; id: string } | null
+type Tab = 'agenda' | 'plans' | 'tasks' | 'settings'
+type Sheet = { mode: 'new'; kind?: Kind; date?: string } | { mode: 'edit'; id: string } | null
+
+/** Tipo por defecto al pulsar + en cada pestaña. */
+const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', settings: 'plan' }
+const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', settings: 'Ajustes' }
 
 function greeting() {
   const h = new Date().getHours()
@@ -38,7 +43,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   const { plans, sync } = usePlans()
   const tags = useTags()
   const priorities = usePriorities()
-  const [tab, setTab] = useState<Tab>('plans')
+  const [tab, setTab] = useState<Tab>('agenda')
   const [sheet, setSheet] = useState<Sheet>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -58,9 +63,16 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   const onToggle = useCallback(
     (plan: Plan) => {
       navigator.vibrate?.(10)
-      const { next, committed } = toggleDone(plan, me, plans)
+      const { next, nextAssignee, committed } = toggleDone(plan, me, plans)
       committed.catch((e: Error) => setToast(e.message))
-      if (next) setToast(`¡Hecho! ✓ Se repite: ${formatDue(next, plan.allDay).toLowerCase()}`)
+      if (next) {
+        const when = formatDue(next, plan.allDay).toLowerCase()
+        setToast(
+          nextAssignee !== plan.assignee
+            ? `¡Hecho! ✓ La próxima (${when}) le toca a ${PEOPLE[nextAssignee].name}`
+            : `¡Hecho! ✓ Se repite: ${when}`,
+        )
+      }
     },
     [me, plans],
   )
@@ -106,10 +118,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
         <div className="flex items-center gap-3 pt-2">
           <Avatar mode={me} size="lg" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-muted">{tab === 'plans' ? `${greeting()},` : 'Vuestro espacio'}</p>
-            <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">
-              {tab === 'plans' ? PEOPLE[me].name : tab === 'calendar' ? 'Calendario' : 'Ajustes'}
-            </h1>
+            <p className="text-sm font-medium text-muted">{tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : 'Vuestro espacio'}</p>
+            <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{TAB_TITLE[tab]}</h1>
           </div>
           <SyncBadge offline={sync.offline && !sync.loading} pending={sync.pending} />
         </div>
@@ -117,8 +127,9 @@ function Home({ user, me }: { user: User; me: PersonId }) {
 
       <main className="px-4 pb-36 pt-2">
         <ErrorBoundary inline key={tab}>
-        {tab === 'plans' ? (
+        {tab === 'plans' || tab === 'tasks' ? (
           <PlansView
+            kind={tab === 'plans' ? 'plan' : 'task'}
             plans={plans}
             me={me}
             tags={tags}
@@ -127,7 +138,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
           />
-        ) : tab === 'calendar' ? (
+        ) : tab === 'agenda' ? (
           <CalendarView
             plans={plans}
             me={me}
@@ -135,7 +146,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             priorities={priorities}
             onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
-            onCreate={(date) => openSheet({ mode: 'new', date })}
+            onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
           />
         ) : (
           <SettingsView user={user} me={me} tags={tags} plans={plans} priorities={priorities} onError={setToast} />
@@ -146,8 +157,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       {/* Botón de crear (flotante, abajo a la derecha, como en las apps de Android) */}
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
         <button
-          onClick={() => openSheet({ mode: 'new' })}
-          aria-label="Nuevo plan"
+          onClick={() => openSheet({ mode: 'new', kind: TAB_KIND[tab] })}
+          aria-label={KINDS[TAB_KIND[tab]].new}
           className="pointer-events-auto grid size-16 place-items-center rounded-[22px] bg-gradient-to-br from-nita via-both to-kitos text-white shadow-xl shadow-violet-500/30 transition active:scale-90"
         >
           <PlusIcon className="size-7" strokeWidth={2.5} />
@@ -156,17 +167,19 @@ function Home({ user, me }: { user: User; me: PersonId }) {
 
       {/* Barra inferior */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-lg grid-cols-3 px-4 pt-2">
+        <div className="mx-auto grid max-w-lg grid-cols-4 px-2 pt-2">
+          <NavButton active={tab === 'agenda'} onClick={() => setTab('agenda')} icon={<CalendarIcon className="size-6" />} label="Agenda" />
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
-          <NavButton active={tab === 'calendar'} onClick={() => setTab('calendar')} icon={<CalendarIcon className="size-6" />} label="Calendario" />
+          <NavButton active={tab === 'tasks'} onClick={() => setTab('tasks')} icon={<CheckIcon className="size-6" strokeWidth={2.5} />} label="Tareas" />
           <NavButton active={tab === 'settings'} onClick={() => setTab('settings')} icon={<SlidersIcon className="size-6" />} label="Ajustes" />
         </div>
       </nav>
 
       {sheet && (sheet.mode === 'new' || editing) && (
         <PlanForm
-          key={sheet.mode === 'edit' ? sheet.id : `new-${sheet.date ?? ''}`}
+          key={sheet.mode === 'edit' ? sheet.id : `new-${sheet.kind ?? ''}-${sheet.date ?? ''}`}
           plan={editing}
+          defaultKind={sheet.mode === 'new' ? sheet.kind : undefined}
           defaultDate={sheet.mode === 'new' ? sheet.date : undefined}
           siblings={siblings}
           me={me}

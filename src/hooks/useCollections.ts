@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { DEFAULT_PRIORITIES } from '../lib/colors'
 import type { NotifPrefs, PersonId, Plan, PriorityConfig, Tag } from '../lib/types'
+import { parseRepeat } from '../lib/recurrence'
 
 export interface SyncState {
   loading: boolean
@@ -35,7 +36,9 @@ export function usePlans() {
                 notes: data.notes ?? '',
                 assignee: data.assignee ?? 'both',
                 groupId: data.groupId ?? null,
-                repeatDays: Array.isArray(data.repeat?.days) && data.repeat.days.length ? data.repeat.days : null,
+                kind: data.kind === 'event' || data.kind === 'task' ? data.kind : 'plan',
+                repeat: parseRepeat(data.repeat),
+                remindWeekBefore: data.remindWeekBefore === true,
                 seriesId: data.seriesId ?? null,
                 spawnedFrom: data.spawnedFrom ?? null,
                 dueAt: data.dueAt ?? null,

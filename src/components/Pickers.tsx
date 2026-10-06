@@ -12,10 +12,21 @@ import { TagChip } from './TagChip'
 
 const MODES: AssignMode[] = ['nita', 'kitos', 'both', 'duplicate']
 
-export function AssigneePicker({ value, onChange, me }: { value: AssignMode; onChange: (m: AssignMode) => void; me: PersonId }) {
+export function AssigneePicker({
+  value,
+  onChange,
+  me,
+  allowDuplicate = true,
+}: {
+  value: AssignMode
+  onChange: (m: AssignMode) => void
+  me: PersonId
+  allowDuplicate?: boolean
+}) {
+  const modes = allowDuplicate ? MODES : MODES.filter((m) => m !== 'duplicate')
   return (
-    <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Asignar a">
-      {MODES.map((m) => {
+    <div className={`grid gap-2 ${allowDuplicate ? 'grid-cols-4' : 'grid-cols-3'}`} role="radiogroup" aria-label="Asignar a">
+      {modes.map((m) => {
         const p = PEOPLE[m]
         const active = value === m
         const sub = m === 'nita' || m === 'kitos' ? relativeLabel(m, me) : p.short

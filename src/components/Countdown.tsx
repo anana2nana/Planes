@@ -11,12 +11,15 @@ export const URGENCY_STYLE: Record<Urgency, string> = {
   none: 'bg-stone-100 text-stone-500',
 }
 
-/** Chip con la fecha tope. Si está cerca, muestra cuenta atrás en vivo (segundo a segundo). */
-export function DueChip({ due, allDay, done }: { due: Date; allDay: boolean; done: boolean }) {
+/**
+ * Chip con la fecha. Si está cerca, muestra cuenta atrás en vivo (segundo a segundo).
+ * Las citas (`event`) no "vencen": al pasar quedan en gris, y si son de todo el día no llevan cuenta atrás.
+ */
+export function DueChip({ due, allDay, done, event = false }: { due: Date; allDay: boolean; done: boolean; event?: boolean }) {
   const now = useNow(1000)
   const diff = due.getTime() - now
-  const urgency = urgencyOf(diff)
-  const live = !done && urgency !== 'far'
+  const urgency = event && diff < 0 ? 'none' : urgencyOf(diff)
+  const live = !done && urgency !== 'far' && urgency !== 'none' && !(event && allDay)
 
   return (
     <span

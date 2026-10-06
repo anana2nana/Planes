@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { Repeat } from './recurrence'
 
 export type PersonId = 'nita' | 'kitos'
 /** A quién está asignado un plan ya guardado. */
@@ -8,15 +9,21 @@ export type AssignMode = Assignee | 'duplicate'
 
 export type PriorityId = 'low' | 'medium' | 'high' | 'urgent'
 
+/** Cita (médico, cumpleaños: no se completa) · Plan (ocio) · Tarea (casa, gata, gimnasio). */
+export type Kind = 'event' | 'plan' | 'task'
+
 export interface Plan {
   id: string
+  kind: Kind
   title: string
   notes: string
   assignee: Assignee
   /** Si es una tarea duplicada, ambas copias comparten este id. */
   groupId: string | null
-  /** Días de la semana en que se repite (0 = domingo … 6 = sábado), o null. */
-  repeatDays: number[] | null
+  /** Cómo se repite, o null. */
+  repeat: Repeat | null
+  /** Avisar también una semana antes (cumpleaños: para el regalo). */
+  remindWeekBefore: boolean
   /** Común a todas las repeticiones de un mismo plan. */
   seriesId: string | null
   /** Repetición anterior de la que se creó este plan al completarla. */
@@ -49,6 +56,7 @@ export type PriorityConfig = Record<PriorityId, PriorityLevel>
 
 /** Datos editables desde el formulario. */
 export interface PlanDraft {
+  kind: Kind
   title: string
   notes: string
   mode: AssignMode
@@ -56,8 +64,12 @@ export interface PlanDraft {
   dueTime: string // hh:mm o ''
   priority: PriorityId
   tagIds: string[]
-  /** Días en que se repite; vacío = no se repite. */
+  /** Días en que se repite; vacío = no se repite (salvo `repeatYearly`). */
   repeatDays: number[]
+  repeatYearly: boolean
+  /** Turnos: cada repetición le toca a la otra persona. */
+  rotate: boolean
+  remindWeekBefore: boolean
 }
 
 /** Preferencias de notificación de cada persona (config/notifications). */

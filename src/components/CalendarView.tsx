@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNow } from '../hooks/useNow'
 import { PEOPLE } from '../lib/people'
 import { dayKey, describeRepeat, upcomingOccurrences } from '../lib/recurrence'
-import { dateToDraft } from '../lib/time'
+import { eventEmoji } from '../lib/kinds'
+import { dateToDraft, formatDue } from '../lib/time'
 import type { Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { ChevronIcon, PlusIcon, RepeatIcon } from './Icons'
@@ -62,9 +63,9 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
       if (!plan.dueAt) continue
       const due = plan.dueAt.toDate()
       add({ plan, date: due, virtual: false })
-      // Repeticiones futuras del plan pendiente (las reales se crean al completarlo).
-      if (plan.repeatDays && !plan.done) {
-        upcomingOccurrences(due, plan.repeatDays, gridEnd).forEach((date) => add({ plan, date, virtual: true }))
+      // Repeticiones futuras (las reales se crean al completar / al pasar la cita).
+      if (plan.repeat && !plan.done) {
+        upcomingOccurrences(due, plan.repeat, gridEnd).forEach((date) => add({ plan, date, virtual: true }))
       }
     }
     map.forEach((list) => list.sort((a, b) => a.date.getTime() - b.date.getTime()))
@@ -75,6 +76,26 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
   const siblingsOf = (p: Plan) => (p.groupId ? plans.filter((s) => s.groupId === p.groupId && s.id !== p.id) : [])
 
   const entries = byDay.get(dayKey(selected)) ?? []
+
+  // Próximas citas (30 días), incluidas las repeticiones (p. ej. cumpleaños).
+  const upcoming = useMemo(() => {
+    const from = now
+    const until = new Date(now + 30 * 86_400_000)
+    const list: Entry[] = []
+    for (const plan of plans) {
+      if (plan.kind !== 'event' || !plan.dueAt) continue
+      const due = plan.dueAt.toDate()
+      const dates = [due, ...(plan.repeat ? upcomingOccurrences(due, plan.repeat, until) : [])]
+      dates
+        .filter((date) => {
+          // Las de todo el día cuentan hasta que acaba el día.
+          const end = plan.allDay ? new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime() : date.getTime()
+          return end >= from && date.getTime() <= until.getTime()
+        })
+        .forEach((date) => list.push({ plan, date, virtual: date !== due }))
+    }
+    return list.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 8)
+  }, [plans, now])
   const undated = plans.filter((p) => !p.dueAt && !p.done).length
 
   const shiftMonth = (delta: number) => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1))
@@ -121,7 +142,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
                   setSelected(day)
                   if (!inMonth) setMonth(new Date(day.getFullYear(), day.getMonth(), 1))
                 }}
-                aria-label={`${dayFmt.format(day)}${list.length ? `, ${list.length} planes` : ''}`}
+                aria-label={`${dayFmt.format(day)}${list.length ? `, ${list.length} cosas` : ''}`}
                 aria-pressed={isSel}
                 className="flex flex-col items-center gap-1 py-1"
               >
@@ -158,7 +179,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
       <section>
         <div className="mb-2 flex items-baseline justify-between px-1">
           <h2 className="text-sm font-extrabold">{capitalize(dayFmt.format(selected))}</h2>
-          <span className="text-xs text-muted">{entries.length ? `${entries.length} ${entries.length === 1 ? 'plan' : 'planes'}` : ''}</span>
+          <span className="text-xs text-muted">{entries.length ? `${entries.length} ${entries.length === 1 ? 'cosa' : 'cosas'}` : ''}</span>
         </div>
 
         <div className="space-y-2.5">
@@ -169,13 +190,13 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
                 onClick={() => onOpen(e.plan)}
                 className="flex w-full items-center gap-3 rounded-3xl border-2 border-dashed border-violet-200 bg-white/60 p-3.5 text-left"
               >
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-violet-100 text-violet-600">
-                  <RepeatIcon className="size-3.5" />
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-violet-100 text-sm text-violet-600">
+                  {e.plan.kind === 'event' ? eventEmoji(!!e.plan.repeat?.yearly) : <RepeatIcon className="size-3.5" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{e.plan.title}</span>
                   <span className="text-[11px] font-semibold text-violet-700">
-                    {e.plan.allDay ? 'Todo el día' : timeFmt.format(e.date)} · {describeRepeat(e.plan.repeatDays ?? [])}
+                    {e.plan.allDay ? 'Todo el día' : timeFmt.format(e.date)} · {e.plan.repeat ? describeRepeat(e.plan.repeat) : ''}
                   </span>
                 </span>
                 <Avatar mode={e.plan.assignee} size="xs" />
@@ -200,15 +221,45 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
             onClick={() => onCreate(dateToDraft(selected, true).dueDate)}
             className="flex w-full items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-stone-200 py-3 text-sm font-bold text-muted active:scale-[0.99]"
           >
-            <PlusIcon className="size-4" /> Añadir plan este día
+            <PlusIcon className="size-4" /> Añadir algo este día
           </button>
 
           {undated > 0 && (
             <p className="px-1 pt-1 text-center text-xs text-muted">
-              {undated} {undated === 1 ? 'plan sin fecha no aparece' : 'planes sin fecha no aparecen'} en el calendario.
+              {undated} {undated === 1 ? 'cosa sin fecha no aparece' : 'cosas sin fecha no aparecen'} en el calendario.
             </p>
           )}
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">Próximas citas</h2>
+        {upcoming.length === 0 ? (
+          <p className="px-1 text-sm text-muted">Ninguna en los próximos 30 días. Médico, cumpleaños… añádelos con + → 📅 Cita.</p>
+        ) : (
+          <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+            {upcoming.map((e) => (
+              <button
+                key={`${e.plan.id}-${e.date.getTime()}`}
+                onClick={() => {
+                  setSelected(e.date)
+                  setMonth(new Date(e.date.getFullYear(), e.date.getMonth(), 1))
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-stone-50"
+              >
+                <span className="text-lg" aria-hidden>
+                  {eventEmoji(!!e.plan.repeat?.yearly)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{e.plan.title}</span>
+                  <span className="text-xs text-muted">{formatDue(e.date, e.plan.allDay, now)}</span>
+                </span>
+                <Avatar mode={e.plan.assignee} size="xs" />
+              </button>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

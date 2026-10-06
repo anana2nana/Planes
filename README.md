@@ -9,6 +9,8 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Tiempo real**: cualquier cambio aparece al instante en el móvil del otro (`onSnapshot`). Con caché offline: funciona sin conexión y sincroniza al volver.
 - **Asignación flexible**: Nita (yo) · Kitos (él) · Nitakitos (ambos) · **Duplicar** (crea una copia independiente para cada uno; editar una actualiza las dos, pero cada uno la marca como hecha por su cuenta y ves el estado de la del otro).
 - **Fechas tope y cuenta atrás en vivo**: los planes de los próximos 7 días muestran cuenta atrás al segundo; el más cercano sale destacado en grande. Agrupados en *Vencidos / Próximos 7 días / Más adelante / Sin fecha*.
+- **Agenda conjunta con tres tipos**: 📅 *Citas* (médico, cumpleaños: no se completan; los cumpleaños se repiten cada año y pueden avisar una semana antes), 💞 *Planes* (ocio) y 🧹 *Tareas* (casa, la gata, el gimnasio). La pestaña Agenda muestra todo en el calendario y las próximas citas; Planes y Tareas tienen su propia lista.
+- **Turnos** en tareas repetidas: cada vez que se completa, la siguiente le toca a la otra persona.
 - **Planes que se repiten** ciertos días de la semana (p. ej. martes y sábados, entre semana, todos los días). Al completar uno aparece el siguiente; si estaba vencido, salta al próximo día que toque sin acumular atrasos.
 - **Calendario** mensual: puntos de color por persona en cada día, repeticiones futuras en tono suave, y al tocar un día ves sus planes o añades uno nuevo con esa fecha.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
@@ -108,7 +110,7 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 
 | Colección | Campos |
 |---|---|
-| `plans/{id}` | `title, notes, assignee ('nita' \| 'kitos' \| 'both'), groupId (copias duplicadas), repeat { days[] } (0 = domingo), seriesId, spawnedFrom, dueAt, allDay, priority, tagIds[], done, doneAt, doneBy, createdBy, createdAt, updatedAt, remindersSent[] (lo gestiona el servidor)` |
+| `plans/{id}` | `kind ('event' \| 'plan' \| 'task'; sin campo = plan), remindWeekBefore, title, notes, assignee ('nita' \| 'kitos' \| 'both'), groupId (copias duplicadas), repeat { days[] (0 = domingo), yearly, rotate }, seriesId, spawnedFrom, dueAt, allDay, priority, tagIds[], done, doneAt, doneBy, createdBy, createdAt, updatedAt, remindersSent[] (lo gestiona el servidor)` |
 | `tags/{id}` | `name, color` |
 | `config/priorities` | `{ urgent \| high \| medium \| low: { label, color } }` |
 | `config/notifications` | `{ nita \| kitos: { activity, reminders, leads[] } }` |

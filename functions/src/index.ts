@@ -1,3 +1,6 @@
+// Todas las fechas (repeticiones, "hoy", "mañana") en hora de España.
+process.env.TZ = 'Europe/Madrid'
+
 import { initializeApp } from 'firebase-admin/app'
 import { FieldValue, Timestamp, getFirestore, type DocumentSnapshot } from 'firebase-admin/firestore'
 import { getMessaging } from 'firebase-admin/messaging'
@@ -6,11 +9,13 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
+import { parseRepeat } from './recurrence.js'
 import {
   LATE_GRACE_MIN,
   activityPushes,
   normalizePrefs,
   reminderPushes,
+  rolloverDue,
   type NotifPrefs,
   type Person,
   type PlanData,
@@ -35,6 +40,7 @@ function toPlan(snap: DocumentSnapshot): PlanData | null {
   const d = snap.data()!
   return {
     id: snap.id,
+    kind: d.kind === 'event' || d.kind === 'task' ? d.kind : 'plan',
     title: d.title ?? '',
     assignee: d.assignee ?? 'both',
     groupId: d.groupId ?? null,
@@ -45,6 +51,8 @@ function toPlan(snap: DocumentSnapshot): PlanData | null {
     createdBy: d.createdBy ?? 'nita',
     remindersSent: d.remindersSent ?? [],
     spawnedFrom: d.spawnedFrom ?? null,
+    repeat: parseRepeat(d.repeat),
+    remindWeekBefore: d.remindWeekBefore === true,
   }
 }
 
@@ -101,7 +109,8 @@ export const onPlanWritten = onDocumentWritten('plans/{planId}', async (event) =
 export const sendReminders = onSchedule({ schedule: 'every 5 minutes', timeZone: 'Europe/Madrid' }, async () => {
   const now = Date.now()
   const prefs = await loadPrefs()
-  const maxLead = Math.max(0, ...prefs.nita.leads, ...prefs.kitos.leads)
+  // + 1 semana por el aviso previo de las citas (cumpleaños).
+  const maxLead = Math.max(7 * 24 * 60, ...prefs.nita.leads, ...prefs.kitos.leads)
 
   const snap = await db
     .collection('plans')
@@ -117,6 +126,18 @@ export const sendReminders = onSchedule({ schedule: 'every 5 minutes', timeZone:
     // Marcamos primero para no repetir el aviso si el envío falla a medias.
     await doc.ref.update({ remindersSent: FieldValue.arrayUnion(...markSent) })
     await Promise.all(pushes.map(send))
+  }
+
+  // Citas repetidas que ya pasaron → a su siguiente fecha (el cambio de fecha
+  // reinicia sus recordatorios en onPlanWritten).
+  const past = await db
+    .collection('plans')
+    .where('kind', '==', 'event')
+    .where('dueAt', '<', Timestamp.fromMillis(now - LATE_GRACE_MIN * 60_000))
+    .get()
+  for (const doc of past.docs) {
+    const next = rolloverDue(toPlan(doc)!, now)
+    if (next !== null) await doc.ref.update({ dueAt: Timestamp.fromMillis(next) })
   }
 })
 

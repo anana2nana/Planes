@@ -4,6 +4,7 @@ import { Avatar } from './Avatar'
 import { DueChip } from './Countdown'
 import { CheckIcon, CopyIcon, NoteIcon, RepeatIcon } from './Icons'
 import { describeRepeat } from '../lib/recurrence'
+import { eventEmoji } from '../lib/kinds'
 import { TagChip } from './TagChip'
 
 interface Props {
@@ -21,6 +22,7 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
   const person = PEOPLE[plan.assignee]
   const tags = plan.tagIds.map((id) => tagsById.get(id)).filter((t): t is Tag => !!t)
   const partnerCopy = siblings[0]
+  const isEvent = plan.kind === 'event'
 
   return (
     <article
@@ -28,9 +30,14 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
         plan.done ? 'opacity-60' : ''
       }`}
     >
-      {/* Barra de prioridad */}
-      <span className="absolute inset-y-3 left-0 w-1 rounded-r-full" style={{ background: priority.color }} aria-hidden />
+      {/* Barra de prioridad (las citas no tienen prioridad) */}
+      {!isEvent && <span className="absolute inset-y-3 left-0 w-1 rounded-r-full" style={{ background: priority.color }} aria-hidden />}
 
+      {isEvent ? (
+        <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-sm ${person.soft}`} aria-hidden>
+          {eventEmoji(!!plan.repeat?.yearly)}
+        </span>
+      ) : (
       <button
         onClick={() => onToggle(plan)}
         aria-label={plan.done ? 'Marcar como pendiente' : 'Marcar como hecho'}
@@ -41,6 +48,7 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
       >
         {plan.done && <CheckIcon className="size-3.5 animate-pop" />}
       </button>
+      )}
 
       <button onClick={() => onOpen(plan)} className="min-w-0 flex-1 text-left">
         <div className="flex items-start gap-2">
@@ -49,17 +57,20 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span
-            className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold"
-            style={{ background: `${priority.color}1f`, color: priority.color }}
-          >
-            {priority.label}
-          </span>
-          {plan.dueAt && <DueChip due={plan.dueAt.toDate()} allDay={plan.allDay} done={plan.done} />}
-          {plan.repeatDays && !plan.done && (
+          {!isEvent && (
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{ background: `${priority.color}1f`, color: priority.color }}
+            >
+              {priority.label}
+            </span>
+          )}
+          {plan.dueAt && <DueChip due={plan.dueAt.toDate()} allDay={plan.allDay} done={plan.done} event={isEvent} />}
+          {plan.repeat && !plan.done && (
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
               <RepeatIcon className="size-3" />
-              {describeRepeat(plan.repeatDays)}
+              {describeRepeat(plan.repeat)}
+              {plan.repeat.rotate && ' · por turnos'}
             </span>
           )}
           {plan.groupId && (

@@ -7,12 +7,13 @@ import type { Assignee, Plan, PersonId, PriorityConfig, Tag } from '../lib/types
 import { Avatar } from './Avatar'
 import { NextUp } from './NextUp'
 import { PlanCard } from './PlanCard'
-import { TagChip } from './TagChip'
 
 type Who = 'all' | Assignee
 type Status = 'pending' | 'done'
 
 interface Props {
+  /** Qué lista es: planes (ocio) o tareas (casa, gata, gimnasio…). */
+  kind: 'plan' | 'task'
   plans: Plan[]
   me: PersonId
   tags: Tag[]
@@ -29,10 +30,15 @@ function byDueThenPriority(a: Plan, b: Plan) {
   return PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority]
 }
 
-export function PlansView({ plans, me, tags, priorities, loading, onOpen, onToggle }: Props) {
+const EMPTY = {
+  plan: { emoji: '🌿', pending: 'Pulsa + para crear vuestro próximo plan.' },
+  task: { emoji: '✨', pending: 'Pulsa + para añadir una tarea (limpiar, la gata, el gimnasio…).' },
+}
+
+export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading, onOpen, onToggle }: Props) {
   const [who, setWho] = useState<Who>('all')
   const [status, setStatus] = useState<Status>('pending')
-  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const plans = useMemo(() => allPlans.filter((p) => p.kind === kind), [allPlans, kind])
   // Re-agrupa cada minuto (las cuentas atrás de cada tarjeta van al segundo por su cuenta).
   const now = useNow(60_000)
 
@@ -40,13 +46,11 @@ export function PlansView({ plans, me, tags, priorities, loading, onOpen, onTogg
 
   const siblingsOf = useMemo(() => {
     const groups = new Map<string, Plan[]>()
-    plans.forEach((p) => p.groupId && groups.set(p.groupId, [...(groups.get(p.groupId) ?? []), p]))
+    allPlans.forEach((p) => p.groupId && groups.set(p.groupId, [...(groups.get(p.groupId) ?? []), p]))
     return (p: Plan) => (p.groupId ? (groups.get(p.groupId) ?? []).filter((s) => s.id !== p.id) : [])
-  }, [plans])
+  }, [allPlans])
 
-  const visible = plans.filter(
-    (p) => (who === 'all' || p.assignee === who) && (!tagFilter || p.tagIds.includes(tagFilter)),
-  )
+  const visible = plans.filter((p) => who === 'all' || p.assignee === who)
   const pending = visible.filter((p) => !p.done).sort(byDueThenPriority)
   const done = visible
     .filter((p) => p.done)
@@ -59,10 +63,17 @@ export function PlansView({ plans, me, tags, priorities, loading, onOpen, onTogg
     both: plans.filter((p) => !p.done && p.assignee === 'both').length,
   }
 
-  const nextUp = pending.find((p) => {
-    const d = dueMillis(p)
-    return d !== null && d >= now
-  })
+  // Tarjeta destacada con cuenta atrás grande: solo en Planes.
+  const nextUp =
+    kind === 'plan'
+      ? pending.find((p) => {
+          const d = dueMillis(p)
+          return d !== null && d >= now
+        })
+      : undefined
+
+  const today = new Date(now)
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).getTime()
 
   // El plan destacado no se repite en la lista.
   const rest = pending.filter((p) => p !== nextUp)
@@ -73,10 +84,18 @@ export function PlansView({ plans, me, tags, priorities, loading, onOpen, onTogg
       : [
           { title: 'Vencidos', tone: 'text-rose-600', items: rest.filter((p) => (dueMillis(p) ?? Infinity) < now) },
           {
+            title: 'Hoy',
+            tone: 'text-both',
+            items: rest.filter((p) => {
+              const d = dueMillis(p)
+              return d !== null && d >= now && d < endOfToday
+            }),
+          },
+          {
             title: 'Próximos 7 días',
             items: rest.filter((p) => {
               const d = dueMillis(p)
-              return d !== null && d >= now && d - now < NEAR_WINDOW_MS
+              return d !== null && d >= endOfToday && d - now < NEAR_WINDOW_MS
             }),
           },
           { title: 'Más adelante', items: rest.filter((p) => (dueMillis(p) ?? -1) - now >= NEAR_WINDOW_MS) },
@@ -137,17 +156,6 @@ export function PlansView({ plans, me, tags, priorities, loading, onOpen, onTogg
         ))}
       </div>
 
-      {/* Filtro por etiqueta */}
-      {tags.length > 0 && (
-        <div className="no-scrollbar -mx-4 -my-1 flex gap-1.5 overflow-x-auto px-4 py-1">
-          {tags.map((t) => (
-            <button key={t.id} onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)} className="shrink-0 transition active:scale-95">
-              <TagChip tag={t} size="md" active={!tagFilter || tagFilter === t.id} />
-            </button>
-          ))}
-        </div>
-      )}
-
       {status === 'pending' && nextUp && <NextUp plan={nextUp} onOpen={onOpen} />}
 
       {loading ? (
@@ -158,9 +166,9 @@ export function PlansView({ plans, me, tags, priorities, loading, onOpen, onTogg
         </div>
       ) : isEmpty ? (
         <div className="py-16 text-center">
-          <div className="text-5xl">{status === 'pending' ? '🌿' : '📭'}</div>
+          <div className="text-5xl">{status === 'pending' ? EMPTY[kind].emoji : '📭'}</div>
           <p className="mt-3 font-bold">{status === 'pending' ? 'Nada pendiente' : 'Todavía nada completado'}</p>
-          <p className="mt-1 text-sm text-muted">{status === 'pending' ? 'Pulsa + para crear vuestro próximo plan.' : 'Lo que completéis aparecerá aquí.'}</p>
+          <p className="mt-1 text-sm text-muted">{status === 'pending' ? EMPTY[kind].pending : 'Lo que completéis aparecerá aquí.'}</p>
         </div>
       ) : (
         groups
