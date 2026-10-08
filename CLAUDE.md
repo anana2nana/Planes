@@ -81,4 +81,4 @@ Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro,
 
 - MEROE está en la **Comunidad de Madrid**: AJD 0,75 % del precio sin IVA (anunciada rebaja al 0,4 % para menores de 40 desde 2027, pendiente de aprobar; no sabemos sus edades).
 - La **reserva (5.000 €) no se descuenta del precio**: es un fondo; si sube el precio, la subida se cubre primero con él. En la app: `countsTowardPrice: false`.
-- "12 meses de obra" = un único pago; falta saber la fecha.
+- "12 meses de obra" = un único pago en julio de 2027 (lo meten ellos en la app).
