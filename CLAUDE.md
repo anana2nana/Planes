@@ -66,4 +66,4 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 
 - Muebles: presupuesto por categoría con barra (ahora solo pagado/previsto) y fotos de tickets.
 - Aviso push el día antes de cada cuota de la cooperativa.
-- Confirmar con Nita: ¿la reserva (5.000 €) se descuenta del precio? ¿Cómo se pagan los "12 meses de obra"? ¿AJD de su comunidad?
+- Confirmar con Nita: ¿la reserva (5.000 €) se descuenta del precio? ¿AJD de su comunidad? ("12 meses de obra" = un único pago; falta saber la fecha).
