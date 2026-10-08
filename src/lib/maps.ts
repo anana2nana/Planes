@@ -68,12 +68,27 @@ export async function resolvePlace(s: Suggestion): Promise<PlaceInfo> {
   }
 }
 
-/** Abre la ruta (la más rápida según Google, con tráfico) desde donde estés. En Android abre la app de Maps. */
-export function directionsUrl(place: PlaceInfo): string {
+/** Ruta en la web de Google Maps (vale en cualquier dispositivo). `navigate` arranca la navegación paso a paso. */
+export function directionsUrl(place: PlaceInfo, navigate = true): string {
   const params = new URLSearchParams({ api: '1', travelmode: 'driving' })
   const label = [place.name, place.address].filter(Boolean).join(', ')
   if (place.lat !== null && place.lng !== null && !place.placeId) params.set('destination', `${place.lat},${place.lng}`)
   else params.set('destination', label)
   if (place.placeId) params.set('destination_place_id', place.placeId)
+  if (navigate) params.set('dir_action', 'navigate')
   return `https://www.google.com/maps/dir/?${params.toString()}`
+}
+
+export const isAndroid = () => /Android/i.test(navigator.userAgent)
+
+/**
+ * Enlace para el botón "Ir". En Android, una app instalada (PWA) abre los enlaces
+ * normales dentro de una pestaña de Chrome; con un enlace `intent:` Chrome abre
+ * directamente la app de Google Maps (y si no está instalada, la web).
+ */
+export function navigationHref(place: PlaceInfo): string {
+  const web = directionsUrl(place)
+  if (!isAndroid()) return web
+  const path = web.replace(/^https:\/\//, '')
+  return `intent://${path}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(web)};end`
 }

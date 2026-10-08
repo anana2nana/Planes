@@ -72,7 +72,8 @@ test('editar o borrar no genera avisos', () => {
 test('recordatorio de 1 h llega a ambos cuando toca', () => {
   const { pushes, markSent } = reminderPushes(plan({ dueMs: NOW + 55 * 60_000 }), prefs, NOW)
   assert.deepEqual(pushes.map((p) => p.to).sort(), ['kitos', 'nita'])
-  assert.equal(pushes[0].title, '⏰ Quedan 55 min')
+  assert.equal(pushes[0].title, '⏰ Cena')
+  assert.match(pushes[0].body, /^Hoy a las \d\d:\d\d \(en 55 min\)$/)
   // El de 1 día también se marca como enviado para que no llegue después.
   assert.deepEqual(markSent.sort(), ['kitos:1440', 'kitos:60', 'nita:1440', 'nita:60'])
 })
@@ -87,7 +88,7 @@ test('no repite un recordatorio ya enviado', () => {
 test('plan creado con poca antelación: un solo aviso, no "queda 1 día"', () => {
   const r = reminderPushes(plan({ assignee: 'nita', dueMs: NOW + 20 * 60_000 }), prefs, NOW)
   assert.equal(r.pushes.length, 1)
-  assert.equal(r.pushes[0].title, '⏰ Quedan 20 min')
+  assert.match(r.pushes[0].body, /\(en 20 min\)$/)
 })
 
 test('respeta preferencias: sin recordatorios para quien los desactiva', () => {
@@ -97,9 +98,17 @@ test('respeta preferencias: sin recordatorios para quien los desactiva', () => {
 
 test('aviso "a la hora" y nada para planes vencidos hace rato o hechos', () => {
   const atTime = { nita: { ...DEFAULT_PREFS, leads: [0] }, kitos: { ...DEFAULT_PREFS, leads: [0] } }
-  assert.equal(reminderPushes(plan({ assignee: 'nita', dueMs: NOW - 2 * 60_000 }), atTime, NOW).pushes[0].title, '⏰ Es ahora')
+  assert.match(reminderPushes(plan({ assignee: 'nita', dueMs: NOW - 2 * 60_000 }), atTime, NOW).pushes[0].body, /\(ahora\)$/)
   assert.equal(reminderPushes(plan({ dueMs: NOW - 2 * H }), atTime, NOW).pushes.length, 0)
   assert.equal(reminderPushes(plan({ done: true, dueMs: NOW + 10 * 60_000 }), prefs, NOW).pushes.length, 0)
+})
+
+test('tarea de todo el día: "Vence hoy" (sin cuenta atrás que se quede vieja)', () => {
+  const end = new Date(NOW)
+  end.setHours(23, 59, 59, 0)
+  const r = reminderPushes(plan({ assignee: 'nita', allDay: true, dueMs: end.getTime(), title: 'Arenero' }), { ...prefs, nita: { ...DEFAULT_PREFS, leads: [1440] } }, NOW)
+  assert.equal(r.pushes[0].title, '⏰ Arenero')
+  assert.equal(r.pushes[0].body, 'Vence hoy')
 })
 
 test('formato del tiempo restante', () => {

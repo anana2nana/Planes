@@ -87,6 +87,16 @@ export function formatDue(dueMs: number, allDay: boolean, nowMs: number): string
   return `${day} a las ${time}`
 }
 
+/** " (en 27 min)", " (en 2 horas)"… o " (ahora)". */
+export function remainingHint(ms: number): string {
+  const min = Math.round(ms / 60_000)
+  if (min <= 0) return ' (ahora)'
+  if (min < 60) return ` (en ${min} min)`
+  const h = Math.round(min / 60)
+  if (h < 24) return h === 1 ? ' (en 1 hora)' : ` (en ${h} horas)`
+  return ''
+}
+
 export function formatRemaining(ms: number): string {
   const min = Math.round(ms / 60_000)
   if (min <= 0) return 'Es ahora'
@@ -212,11 +222,15 @@ export function reminderPushes(
           tag: `due:${plan.id}`,
         })
       } else {
+        // La notificación no se actualiza sola, así que el texto principal es la HORA
+        // (no caduca); "(en 27 min)" es solo orientativo en el momento de llegar.
+        const when = capitalize(formatDue(due, plan.allDay, nowMs))
+        const hint = plan.allDay ? '' : remainingHint(due - nowMs)
         pushes.push({
           to: person,
           kind: 'reminder',
-          title: `⏰ ${formatRemaining(due - nowMs)}`,
-          body: `${plan.title} · ${formatDue(due, plan.allDay, nowMs)}`,
+          title: `⏰ ${plan.title}`,
+          body: plan.allDay ? `Vence ${formatDue(due, true, nowMs)}` : `${when}${hint}`,
           tag: `due:${plan.id}`,
         })
       }

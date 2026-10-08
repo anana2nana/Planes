@@ -61,6 +61,8 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - `pkill -f vite` mata también tu propia shell: busca PIDs con `ps` + `awk`, y nunca en el mismo comando que arranca esos procesos (el texto del comando también coincide).
 - En español `Intl.NumberFormat` no separa miles con 4 cifras ("1214 €"): usar `useGrouping: 'always'`.
 - No hacer `git add -f` de archivos `.env` (lo bloquea la política de permisos).
+- En la PWA de Android, un enlace https a Google Maps se abre en una pestaña de Chrome, no en la app: usar el enlace `intent://…;package=com.google.android.apps.maps` (`navigationHref` en `lib/maps.ts`, componente `DirectionsLink`).
+- Las notificaciones push no se actualizan solas: nada de cuentas atrás en el texto ("Quedan 27 min" se queda viejo); poner la hora ("Hoy a las 19:00 (en 27 min)").
 
 ## Ideas pendientes
 

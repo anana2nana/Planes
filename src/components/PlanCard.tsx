@@ -3,7 +3,7 @@ import type { Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { DueChip } from './Countdown'
 import { CheckIcon, CopyIcon, NavigateIcon, NoteIcon, PinIcon, RepeatIcon } from './Icons'
-import { directionsUrl } from '../lib/maps'
+import { DirectionsLink } from './DirectionsLink'
 import { describeRepeat } from '../lib/recurrence'
 import { eventEmoji } from '../lib/kinds'
 import { TagChip } from './TagChip'
@@ -101,16 +101,10 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
       </button>
 
       {plan.place && !plan.done && (
-        <a
-          href={directionsUrl(plan.place)}
-          target="_blank"
-          rel="noopener"
-          aria-label={`Cómo llegar a ${plan.place.name}`}
-          className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-center rounded-2xl bg-sky-50 px-2.5 py-2 text-[10px] font-bold text-sky-700 active:scale-95"
-        >
+        <DirectionsLink place={plan.place} className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-center rounded-2xl bg-sky-50 px-2.5 py-2 text-[10px] font-bold text-sky-700 active:scale-95">
           <NavigateIcon className="size-5" />
           Ir
-        </a>
+        </DirectionsLink>
       )}
     </article>
   )

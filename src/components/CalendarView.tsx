@@ -7,7 +7,7 @@ import { dateToDraft, formatDue } from '../lib/time'
 import type { Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { ChevronIcon, NavigateIcon, PlusIcon, RepeatIcon } from './Icons'
-import { directionsUrl } from '../lib/maps'
+import { DirectionsLink } from './DirectionsLink'
 import { PlanCard } from './PlanCard'
 
 interface Props {
@@ -262,15 +262,9 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
                   <Avatar mode={e.plan.assignee} size="xs" />
                 </button>
                 {e.plan.place && (
-                  <a
-                    href={directionsUrl(e.plan.place)}
-                    target="_blank"
-                    rel="noopener"
-                    aria-label={`Cómo llegar a ${e.plan.place.name}`}
-                    className="mr-3 grid size-10 shrink-0 place-items-center rounded-full bg-sky-50 text-sky-700 active:scale-95"
-                  >
+                  <DirectionsLink place={e.plan.place} className="mr-3 grid size-10 shrink-0 place-items-center rounded-full bg-sky-50 text-sky-700 active:scale-95">
                     <NavigateIcon className="size-5" />
-                  </a>
+                  </DirectionsLink>
                 )}
               </div>
             ))}
