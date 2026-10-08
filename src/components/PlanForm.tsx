@@ -6,7 +6,8 @@ import { DAY_NAME, DAY_SHORT, WEEK_ORDER, describeRepeat, firstOccurrence, nextO
 import { createPlan, deletePlans, updatePlan } from '../services/plans'
 import type { Kind, Plan, PersonId, PlanDraft, PriorityConfig, Tag } from '../lib/types'
 import { BottomSheet } from './BottomSheet'
-import { BellIcon, CalendarIcon, CopyIcon, FlagIcon, NoteIcon, RepeatIcon, TagIcon, TrashIcon, UsersIcon } from './Icons'
+import { BellIcon, CalendarIcon, CopyIcon, FlagIcon, NoteIcon, PinIcon, RepeatIcon, TagIcon, TrashIcon, UsersIcon } from './Icons'
+import { PlaceField } from './PlaceField'
 import { AssigneePicker, PriorityPicker, TagPicker } from './Pickers'
 
 interface Props {
@@ -38,6 +39,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string): Plan
       repeatYearly: false,
       rotate: false,
       remindWeekBefore: false,
+      place: null,
     }
   }
   return {
@@ -52,6 +54,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string): Plan
     repeatYearly: plan.repeat?.yearly ?? false,
     rotate: plan.repeat?.rotate ?? false,
     remindWeekBefore: plan.remindWeekBefore,
+    place: plan.place,
   }
 }
 
@@ -259,6 +262,10 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
           {draft.dueDate && !draft.dueTime && (
             <p className="mt-1.5 text-xs text-muted">{isEvent ? 'Sin hora: todo el día.' : 'Sin hora: vence al final del día.'}</p>
           )}
+        </Field>
+
+        <Field icon={<PinIcon className="size-4" />} label="Dónde (opcional)">
+          <PlaceField value={draft.place} onChange={(p) => set('place', p)} />
         </Field>
 
         <Field icon={<RepeatIcon className="size-4" />} label="Repetir">

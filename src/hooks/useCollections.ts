@@ -14,6 +14,18 @@ export interface SyncState {
   error: string | null
 }
 
+function parsePlace(raw: unknown): Plan['place'] {
+  const p = raw as Partial<NonNullable<Plan['place']>> | null | undefined
+  if (!p || typeof p.name !== 'string' || !p.name) return null
+  return {
+    name: p.name,
+    address: typeof p.address === 'string' ? p.address : '',
+    placeId: typeof p.placeId === 'string' ? p.placeId : null,
+    lat: typeof p.lat === 'number' ? p.lat : null,
+    lng: typeof p.lng === 'number' ? p.lng : null,
+  }
+}
+
 const initialSync: SyncState = { loading: true, offline: false, pending: false, error: null }
 
 /** Planes en tiempo real: cualquier cambio de cualquiera de los dos aparece al instante. */
@@ -39,6 +51,7 @@ export function usePlans() {
                 kind: data.kind === 'event' || data.kind === 'task' ? data.kind : 'plan',
                 repeat: parseRepeat(data.repeat),
                 remindWeekBefore: data.remindWeekBefore === true,
+                place: parsePlace(data.place),
                 seriesId: data.seriesId ?? null,
                 spawnedFrom: data.spawnedFrom ?? null,
                 dueAt: data.dueAt ?? null,

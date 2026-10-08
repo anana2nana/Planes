@@ -66,3 +66,9 @@ export const RepeatIcon = (p: P) => (
 export const ChevronIcon = (p: P) => (
   <svg {...base} {...p}><path d="M9 6l6 6-6 6" /></svg>
 )
+export const PinIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M12 21s-7-6.2-7-11.5A7 7 0 0112 2.5a7 7 0 017 7C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+)
+export const NavigateIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M3 11l18-8-8 18-2-8-8-2z" /></svg>
+)

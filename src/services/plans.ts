@@ -39,6 +39,7 @@ function sharedFields(draft: PlanDraft, seriesId: string | null) {
     tagIds: draft.tagIds,
     repeat,
     remindWeekBefore: draft.kind === 'event' && draft.remindWeekBefore,
+    place: draft.place,
     seriesId: repeats ? (seriesId ?? newId()) : seriesId,
   }
 }
@@ -150,6 +151,7 @@ export function toggleDone(
         tagIds: plan.tagIds,
         repeat: plan.repeat,
         remindWeekBefore: plan.remindWeekBefore,
+        place: plan.place,
         seriesId,
         spawnedFrom: plan.id,
         done: false,

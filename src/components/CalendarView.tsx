@@ -6,7 +6,8 @@ import { eventEmoji } from '../lib/kinds'
 import { dateToDraft, formatDue } from '../lib/time'
 import type { Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
-import { ChevronIcon, PlusIcon, RepeatIcon } from './Icons'
+import { ChevronIcon, NavigateIcon, PlusIcon, RepeatIcon } from './Icons'
+import { directionsUrl } from '../lib/maps'
 import { PlanCard } from './PlanCard'
 
 interface Props {
@@ -239,24 +240,39 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
         ) : (
           <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
             {upcoming.map((e) => (
-              <button
-                key={`${e.plan.id}-${e.date.getTime()}`}
-                onClick={() => {
-                  setSelected(e.date)
-                  setMonth(new Date(e.date.getFullYear(), e.date.getMonth(), 1))
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-stone-50"
-              >
-                <span className="text-lg" aria-hidden>
-                  {eventEmoji(!!e.plan.repeat?.yearly)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{e.plan.title}</span>
-                  <span className="text-xs text-muted">{formatDue(e.date, e.plan.allDay, now)}</span>
-                </span>
-                <Avatar mode={e.plan.assignee} size="xs" />
-              </button>
+              <div key={`${e.plan.id}-${e.date.getTime()}`} className="flex items-center">
+                <button
+                  onClick={() => {
+                    setSelected(e.date)
+                    setMonth(new Date(e.date.getFullYear(), e.date.getMonth(), 1))
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-stone-50"
+                >
+                  <span className="text-lg" aria-hidden>
+                    {eventEmoji(!!e.plan.repeat?.yearly)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{e.plan.title}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {formatDue(e.date, e.plan.allDay, now)}
+                      {e.plan.place && ` · ${e.plan.place.name}`}
+                    </span>
+                  </span>
+                  <Avatar mode={e.plan.assignee} size="xs" />
+                </button>
+                {e.plan.place && (
+                  <a
+                    href={directionsUrl(e.plan.place)}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={`Cómo llegar a ${e.plan.place.name}`}
+                    className="mr-3 grid size-10 shrink-0 place-items-center rounded-full bg-sky-50 text-sky-700 active:scale-95"
+                  >
+                    <NavigateIcon className="size-5" />
+                  </a>
+                )}
+              </div>
             ))}
           </div>
         )}

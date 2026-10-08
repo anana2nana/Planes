@@ -2,7 +2,8 @@ import { PEOPLE } from '../lib/people'
 import type { Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { DueChip } from './Countdown'
-import { CheckIcon, CopyIcon, NoteIcon, RepeatIcon } from './Icons'
+import { CheckIcon, CopyIcon, NavigateIcon, NoteIcon, PinIcon, RepeatIcon } from './Icons'
+import { directionsUrl } from '../lib/maps'
 import { describeRepeat } from '../lib/recurrence'
 import { eventEmoji } from '../lib/kinds'
 import { TagChip } from './TagChip'
@@ -87,10 +88,30 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
           ))}
         </div>
 
+        {plan.place && (
+          <span className="mt-2 flex items-center gap-1 text-xs font-medium text-muted">
+            <PinIcon className="size-3.5 shrink-0 text-rose-400" />
+            <span className="truncate">{plan.place.name}</span>
+          </span>
+        )}
+
         {plan.done && plan.doneBy && plan.assignee === 'both' && (
           <p className="mt-1.5 text-[11px] text-muted">Hecho por {plan.doneBy === me ? 'ti' : PEOPLE[plan.doneBy].name}</p>
         )}
       </button>
+
+      {plan.place && !plan.done && (
+        <a
+          href={directionsUrl(plan.place)}
+          target="_blank"
+          rel="noopener"
+          aria-label={`Cómo llegar a ${plan.place.name}`}
+          className="flex shrink-0 flex-col items-center justify-center gap-0.5 self-center rounded-2xl bg-sky-50 px-2.5 py-2 text-[10px] font-bold text-sky-700 active:scale-95"
+        >
+          <NavigateIcon className="size-5" />
+          Ir
+        </a>
+      )}
     </article>
   )
 }

@@ -9,6 +9,15 @@ export type AssignMode = Assignee | 'duplicate'
 
 export type PriorityId = 'low' | 'medium' | 'high' | 'urgent'
 
+/** Un sitio (de Google Maps o escrito a mano). */
+export interface PlaceInfo {
+  name: string
+  address: string
+  placeId: string | null
+  lat: number | null
+  lng: number | null
+}
+
 /** Cita (médico, cumpleaños: no se completa) · Plan (ocio) · Tarea (casa, gata, gimnasio). */
 export type Kind = 'event' | 'plan' | 'task'
 
@@ -24,6 +33,8 @@ export interface Plan {
   repeat: Repeat | null
   /** Avisar también una semana antes (cumpleaños: para el regalo). */
   remindWeekBefore: boolean
+  /** Dónde (para "Cómo llegar"). */
+  place: PlaceInfo | null
   /** Común a todas las repeticiones de un mismo plan. */
   seriesId: string | null
   /** Repetición anterior de la que se creó este plan al completarla. */
@@ -70,6 +81,7 @@ export interface PlanDraft {
   /** Turnos: cada repetición le toca a la otra persona. */
   rotate: boolean
   remindWeekBefore: boolean
+  place: PlaceInfo | null
 }
 
 /** Preferencias de notificación de cada persona (config/notifications). */
