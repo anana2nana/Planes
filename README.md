@@ -129,7 +129,7 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 | `config/priorities` | `{ urgent \| high \| medium \| low: { label, color } }` |
 | `config/notifications` | `{ nita \| kitos: { activity, reminders, leads[] } }` |
 | `ideas/{id}` | `title, category, place, notes, done, addedBy` |
-| `receipts/{id}` | `itemId, dataUrl (JPEG comprimido), addedBy` |
+| `receipts/{id}` | `itemId, data (JPEG comprimido, data URL), addedBy` |
 | `pet/profile` · `petCare/{id}` | ficha de la gata · `title, every {n, unit}, last, history[]` |
 | `config/couple` · `config/calendar` | `since` · `token` (enlace secreto del calendario) |
 | `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |
