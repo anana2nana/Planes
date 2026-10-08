@@ -6,6 +6,9 @@ import { NEAR_WINDOW_MS, dueMillis } from '../lib/time'
 import type { Assignee, Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { NextUp } from './NextUp'
+import { IdeasView } from './IdeasView'
+import { useIdeas } from '../hooks/useIdeas'
+import type { Idea } from '../lib/ideas'
 import { PlanCard } from './PlanCard'
 
 type Who = 'all' | Assignee
@@ -21,6 +24,9 @@ interface Props {
   loading: boolean
   onOpen: (plan: Plan) => void
   onToggle: (plan: Plan) => void
+  /** Convertir una idea de "Algún día" en plan. */
+  onMakePlan?: (idea: Idea) => void
+  onError?: (msg: string) => void
 }
 
 function byDueThenPriority(a: Plan, b: Plan) {
@@ -35,7 +41,10 @@ const EMPTY = {
   task: { emoji: '✨', pending: 'Pulsa + para añadir una tarea (limpiar, la gata, el gimnasio…).' },
 }
 
-export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading, onOpen, onToggle }: Props) {
+export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading, onOpen, onToggle, onMakePlan, onError }: Props) {
+  const [someday, setSomeday] = useState(false)
+  const ideas = useIdeas()
+  const pendingIdeas = ideas.filter((i) => !i.done).length
   const [who, setWho] = useState<Who>('all')
   const [status, setStatus] = useState<Status>('pending')
   const plans = useMemo(() => allPlans.filter((p) => p.kind === kind), [allPlans, kind])
@@ -119,6 +128,22 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
 
   return (
     <div className="space-y-5">
+      {kind === 'plan' && (
+        <div className="grid grid-cols-2 rounded-2xl bg-stone-200/60 p-1 text-sm font-bold" role="tablist" aria-label="Planes o ideas">
+          {[
+            { v: false, label: '📅 Con fecha' },
+            { v: true, label: `💡 Algún día${pendingIdeas ? ` · ${pendingIdeas}` : ''}` },
+          ].map((o) => (
+            <button key={String(o.v)} role="tab" aria-selected={someday === o.v} onClick={() => setSomeday(o.v)} className={`rounded-xl py-2 transition ${someday === o.v ? 'bg-surface shadow-sm' : 'text-muted'}`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {kind === 'plan' && someday ? (
+        <IdeasView me={me} onMakePlan={(i) => onMakePlan?.(i)} onError={(m) => onError?.(m)} />
+      ) : (
+      <>
       {/* Filtro por persona */}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {(['all', 'nita', 'kitos', 'both'] as Who[]).map((w) => {
@@ -128,7 +153,7 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
               key={w}
               onClick={() => setWho(w)}
               className={`flex shrink-0 items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-sm font-bold transition active:scale-95 ${
-                active ? 'bg-ink text-white shadow-md shadow-ink/20' : 'bg-white text-ink shadow-sm'
+                active ? 'bg-ink text-cream shadow-md shadow-ink/20' : 'bg-surface text-ink shadow-sm'
               }`}
             >
               {w === 'all' ? (
@@ -137,7 +162,7 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
                 <Avatar mode={w} size="sm" />
               )}
               {w === 'all' ? 'Todos' : PEOPLE[w].name}
-              <span className={`tabular text-xs ${active ? 'text-white/60' : 'text-muted'}`}>{counts[w]}</span>
+              <span className={`tabular text-xs ${active ? 'text-cream/60' : 'text-muted'}`}>{counts[w]}</span>
             </button>
           )
         })}
@@ -149,7 +174,7 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
           <button
             key={s}
             onClick={() => setStatus(s)}
-            className={`rounded-xl py-2 transition ${status === s ? 'bg-white shadow-sm' : 'text-muted'}`}
+            className={`rounded-xl py-2 transition ${status === s ? 'bg-surface shadow-sm' : 'text-muted'}`}
           >
             {s === 'pending' ? `Pendientes · ${pending.length}` : `Hechos · ${done.length}`}
           </button>
@@ -161,7 +186,7 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-3xl bg-white/70" />
+            <div key={i} className="h-20 animate-pulse rounded-3xl bg-surface/70" />
           ))}
         </div>
       ) : isEmpty ? (
@@ -181,6 +206,8 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
               <div className="space-y-2.5">{g.items.map(card)}</div>
             </section>
           ))
+      )}
+      </>
       )}
     </div>
   )

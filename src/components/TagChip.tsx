@@ -10,7 +10,7 @@ export function TagChip({ tag, size = 'sm', active = true }: { tag: Tag; size?: 
       style={
         active
           ? { background: tint(tag.color, 0.16), color: deepen(tag.color) }
-          : { background: '#f5f5f4', color: '#8a7f93' }
+          : { background: 'var(--color-stone-100)', color: 'var(--color-muted)' }
       }
     >
       <span className="size-1.5 shrink-0 rounded-full" style={{ background: active ? tag.color : '#d6d3d1' }} />

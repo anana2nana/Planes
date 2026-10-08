@@ -34,7 +34,7 @@ export function NumberField({
     if (!focused) setText(value === null ? '' : numFmt.format(value))
   }, [value, focused])
   return (
-    <label className={`flex h-12 items-center gap-2 rounded-2xl border border-stone-200 bg-white px-3 focus-within:border-both ${className}`}>
+    <label className={`flex h-12 items-center gap-2 rounded-2xl border border-stone-200 bg-surface px-3 focus-within:border-both ${className}`}>
       <input
         inputMode="decimal"
         value={text}
@@ -54,7 +54,7 @@ export function NumberField({
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-3xl bg-white p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)] ${className}`}>{children}</section>
+  return <section className={`rounded-3xl bg-surface p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)] ${className}`}>{children}</section>
 }
 
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
@@ -79,7 +79,7 @@ export function Switch({ label, hint, checked, onChange }: { label: string; hint
         {hint && <span className="mt-0.5 block text-xs text-muted">{hint}</span>}
       </span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-200 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:size-6 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
+      <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-200 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:size-6 after:rounded-full after:bg-surface after:shadow after:transition peer-checked:after:translate-x-5" />
     </label>
   )
 }
@@ -95,7 +95,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`truncate rounded-xl px-2 py-2 text-sm font-bold transition ${value === o.value ? 'bg-white shadow-sm' : 'text-muted'}`}
+          className={`truncate rounded-xl px-2 py-2 text-sm font-bold transition ${value === o.value ? 'bg-surface shadow-sm' : 'text-muted'}`}
         >
           {o.label}
         </button>

@@ -100,12 +100,12 @@ export function LineChart({
           </linearGradient>
         </defs>
         {ticks.map((t, i) => (
-          <line key={i} x1={pad.l} x2={W - pad.r} y1={yOf(t)} y2={yOf(t)} stroke="#e7e5e4" strokeWidth="1" strokeDasharray={i === 0 ? '' : '2 3'} />
+          <line key={i} x1={pad.l} x2={W - pad.r} y1={yOf(t)} y2={yOf(t)} stroke="var(--color-stone-200)" strokeWidth="1" strokeDasharray={i === 0 ? '' : '2 3'} />
         ))}
         <path d={area} fill={`url(#${gradId})`} />
         <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {hover !== null && <line x1={xs[h]} x2={xs[h]} y1={pad.t} y2={H - pad.b} stroke="#a8a29e" strokeWidth="1" />}
-        <circle cx={xs[h]} cy={ys[h]} r="4.5" fill={color} stroke="#fff" strokeWidth="2" />
+        <circle cx={xs[h]} cy={ys[h]} r="4.5" fill={color} stroke="var(--color-surface)" strokeWidth="2" />
         <text x={pad.l} y={H - 5} fontSize="10" fill="#8a7f93">
           {formatX(points[0].x)}
         </text>
@@ -114,7 +114,7 @@ export function LineChart({
         </text>
       </svg>
       <div
-        className="pointer-events-none absolute top-0 rounded-lg bg-ink px-2 py-1 text-[11px] font-semibold text-white shadow-lg"
+        className="pointer-events-none absolute top-0 rounded-lg bg-ink px-2 py-1 text-[11px] font-semibold text-cream shadow-lg"
         style={{ left: `clamp(0px, calc(${(xs[h] / W) * 100}% - 48px), calc(100% - 110px))` }}
       >
         <span className="opacity-70">{formatX(points[h].x)}</span> · {formatY(points[h].y)}

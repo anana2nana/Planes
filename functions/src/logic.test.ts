@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_PREFS, activityPushes, digestPush, formatRemaining, normalizePrefs, reminderPushes, rolloverDue, type PlanData } from './logic.js'
+import { DEFAULT_PREFS, activityPushes, digestPush, formatRemaining, normalizePrefs, reminderPushes, rolloverDue, specialDay, type PlanData } from './logic.js'
 
 const H = 3_600_000
 const NOW = Date.parse('2026-10-06T10:00:00+02:00')
@@ -269,4 +269,85 @@ test('src/home.ts es idéntico al de la app', () => {
   const here = fileURLToPath(new URL('../src/home.ts', import.meta.url))
   const app = fileURLToPath(new URL('../../src/lib/home.ts', import.meta.url))
   assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
+})
+
+test('días especiales: aniversario, cada 100 días y resumen aunque no haya nada más', () => {
+  assert.equal(specialDay('2020-10-06', new Date('2026-10-06T08:00:00')), '🎉 ¡Hoy hacéis 6 años juntos!')
+  assert.equal(specialDay('2024-01-01', new Date('2026-09-27T08:00:00')), '💞 ¡Hoy hacéis 1.000 días juntos!')
+  assert.equal(specialDay('2024-01-01', new Date('2026-09-28T08:00:00')), null)
+  const n = digestPush('kitos', [], new Date('2026-10-06T08:00:00').getTime(), '🎉 ¡Hoy hacéis 6 años juntos!')!
+  assert.equal(n.body, '🎉 ¡Hoy hacéis 6 años juntos!')
+})
+
+import { petPushes } from './homeAlerts.js'
+
+test('src/pet.ts es idéntico al de la app', () => {
+  const here = fileURLToPath(new URL('../src/pet.ts', import.meta.url))
+  const app = fileURLToPath(new URL('../../src/lib/pet.ts', import.meta.url))
+  assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
+})
+
+test('gata: aviso la víspera de un cuidado y recordatorio semanal si sigue pendiente', () => {
+  const prefs = { nita: { ...DEFAULT_PREFS, home: true }, kitos: { ...DEFAULT_PREFS, home: false } }
+  const pipeta = { id: 'p', title: 'Pipeta', every: { n: 1, unit: 'month' as const }, last: '2026-09-09', history: [] }
+  const tomorrow = petPushes([pipeta], 'Mía', prefs, new Date('2026-10-08T20:00:00'))
+  assert.equal(tomorrow.length, 1)
+  assert.equal(tomorrow[0].to, 'nita')
+  assert.equal(tomorrow[0].title, '🐱 Mañana toca con Mía')
+  assert.match(tomorrow[0].body, /^Pipeta\n/)
+  assert.equal(petPushes([pipeta], 'Mía', prefs, new Date('2026-10-07T20:00:00')).length, 0)
+  const late = petPushes([pipeta], '', prefs, new Date('2026-10-16T20:00:00'))
+  assert.equal(late[0].title, '🐱 Pendiente con la gata')
+  assert.equal(petPushes([pipeta], '', prefs, new Date('2026-10-12T20:00:00')).length, 0)
+  assert.equal(petPushes([{ ...pipeta, last: null }], '', prefs, new Date('2026-10-12T20:00:00')).length, 0)
+})
+
+import { buildIcs, escapeText, feedPlans, fold, type IcsPlan } from './ics.js'
+
+const icsBase: IcsPlan = {
+  id: 'a1', kind: 'event', title: 'Cumple de Ana', assignee: 'both', groupId: null, dueMs: new Date('2026-11-03T00:00:00').getTime(), allDay: true,
+  done: false, doneBy: null, createdBy: 'nita', remindersSent: [], spawnedFrom: null, repeat: { days: [], yearly: true, rotate: false },
+  remindWeekBefore: false, notes: '', place: null,
+}
+
+test('iCal: cumpleaños de todo el día que se repite cada año', () => {
+  const ics = buildIcs([icsBase], Date.UTC(2026, 9, 8))
+  assert.match(ics, /^BEGIN:VCALENDAR\r\n/)
+  assert.match(ics, /DTSTART;VALUE=DATE:20261103\r\nDTEND;VALUE=DATE:20261104\r\n/)
+  assert.match(ics, /RRULE:FREQ=YEARLY\r\n/)
+  assert.match(ics, /SUMMARY:Cumple de Ana\r\n/)
+  assert.match(ics, /END:VCALENDAR\r\n$/)
+})
+
+test('iCal: cita con hora en UTC, semanal, con lugar y notas escapadas', () => {
+  const p: IcsPlan = { ...icsBase, allDay: false, dueMs: new Date('2026-10-13T19:00:00').getTime(), repeat: { days: [6, 2], yearly: false, rotate: false }, notes: 'Llevar: toalla, agua', place: { name: 'Gimnasio', address: 'Calle Mayor 1' } }
+  const ics = buildIcs([p], 0)
+  assert.match(ics, /DTSTART:20261013T170000Z\r\nDTEND:20261013T180000Z/)
+  assert.match(ics, /RRULE:FREQ=WEEKLY;BYDAY=TU,SA/)
+  assert.match(ics, /DESCRIPTION:Para: Los dos\\nLlevar: toalla\\, agua/)
+  assert.match(ics, /LOCATION:Gimnasio\\, Calle Mayor 1/)
+})
+
+test('iCal: qué entra en el feed de cada uno', () => {
+  const plans: IcsPlan[] = [
+    icsBase,
+    { ...icsBase, id: 't1', kind: 'task', assignee: 'kitos', repeat: null },
+    { ...icsBase, id: 't2', kind: 'task', assignee: 'nita', done: true },
+    { ...icsBase, id: 'd1', kind: 'plan', assignee: 'nita', groupId: 'g' },
+    { ...icsBase, id: 'd2', kind: 'plan', assignee: 'kitos', groupId: 'g' },
+    { ...icsBase, id: 'x', kind: 'plan', dueMs: null },
+  ]
+  assert.deepEqual(feedPlans(plans, null).map((p) => p.id), ['a1', 't1', 'd1'])
+  assert.deepEqual(feedPlans(plans, 'nita').map((p) => p.id), ['a1', 'd1'])
+  assert.deepEqual(feedPlans(plans, 'kitos').map((p) => p.id), ['a1', 't1', 'd2'])
+  assert.match(buildIcs([{ ...icsBase, kind: 'task', repeat: null }], 0), /SUMMARY:🧹 Cumple de Ana\r\nDESCRIPTION/)
+  assert.doesNotMatch(buildIcs([{ ...icsBase, kind: 'task' }], 0), /RRULE/)
+})
+
+test('iCal: escapado y líneas cortadas a 75 bytes sin romper tildes ni emojis', () => {
+  assert.equal(escapeText('a;b,c\\d\ne'), 'a\\;b\\,c\\\\d\\ne')
+  const long = 'SUMMARY:' + 'ñ'.repeat(60) + '🎂'.repeat(10)
+  const folded = fold(long)
+  for (const l of folded.split('\r\n')) assert.ok(Buffer.byteLength(l) <= 75)
+  assert.equal(folded.split('\r\n').map((l, i) => (i ? l.slice(1) : l)).join(''), long)
 })

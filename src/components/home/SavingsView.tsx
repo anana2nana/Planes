@@ -111,7 +111,7 @@ export function SavingsView({
             {PEOPLE[me].name}, hace más de un mes que no actualizas {myStale.length === 1 ? `«${myStale[0].name}»` : 'tus cuentas'}. Toca para poner lo que hay ahora.
           </p>
         )}
-        <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+        <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
           {funds.map((x) => (
             <button key={x.id} onClick={() => setEditing(x)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-stone-50">
               <Avatar mode={x.owner} size="sm" />
@@ -186,7 +186,7 @@ function FundForm({ fund, me, onClose, onError }: { fund: Fund | null; me: Perso
               <TrashIcon className="size-5" />
             </button>
           )}
-          <button onClick={save} disabled={!canSave} className="h-13 flex-1 rounded-2xl bg-ink font-bold text-white disabled:opacity-30">
+          <button onClick={save} disabled={!canSave} className="h-13 flex-1 rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
             Guardar
           </button>
         </div>
@@ -200,7 +200,7 @@ function FundForm({ fund, me, onClose, onError }: { fund: Fund | null; me: Perso
             onChange={(e) => setName(e.target.value)}
             placeholder="Cuenta común, Openbank, ayuda familiar…"
             aria-label="Nombre"
-            className="h-12 w-full rounded-2xl border border-stone-200 bg-white px-3 font-semibold outline-none focus:border-both"
+            className="h-12 w-full rounded-2xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both"
           />
         </div>
         <div>

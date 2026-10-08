@@ -272,14 +272,14 @@ const EMOJI: Record<Kind, string> = { event: '📅', plan: '💞', task: '🧹' 
  * Resumen de la mañana para una persona: lo de hoy (citas, planes, tareas suyas o de los dos)
  * y cuántas tareas/planes arrastra de días anteriores. null si no hay nada.
  */
-export function digestPush(person: Person, plans: PlanData[], nowMs: number): Push | null {
+export function digestPush(person: Person, plans: PlanData[], nowMs: number, extra: string | null = null): Push | null {
   const now = new Date(nowMs)
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
   const mine = plans.filter((p) => !p.done && p.dueMs !== null && targetsOf(p.assignee).includes(person))
   const today = mine.filter((p) => p.dueMs! >= start && p.dueMs! < end).sort((a, b) => a.dueMs! - b.dueMs!)
   const overdue = mine.filter((p) => p.kind !== 'event' && p.dueMs! < start).length
-  if (today.length === 0 && overdue === 0) return null
+  if (today.length === 0 && overdue === 0 && !extra) return null
 
   const MAX = 4
   const parts = today.slice(0, MAX).map((p) => {
@@ -288,6 +288,19 @@ export function digestPush(person: Person, plans: PlanData[], nowMs: number): Pu
   })
   if (today.length > MAX) parts.push(`y ${today.length - MAX} más`)
   const late = overdue ? `⚠️ ${overdue} ${overdue === 1 ? 'pendiente atrasada' : 'pendientes atrasadas'}` : ''
-  const body = parts.length ? [parts.join(' · '), late].filter(Boolean).join('\n') : `Nada para hoy. ${late}`
+  const body = [extra, parts.length ? parts.join(' · ') : extra ? '' : 'Nada para hoy.', late].filter(Boolean).join('\n')
   return { to: person, kind: 'reminder', title: `☀️ Buenos días, ${NAME[person]}`, body, tag: 'digest' }
+}
+
+// ─── Días especiales (misma lógica que src/lib/couple.ts) ───────────────────
+
+/** Texto si hoy es un día especial: aniversario o múltiplo de 100 días juntos. */
+export function specialDay(since: string, now: Date): string | null {
+  const [y, m, d] = since.split('-').map(Number)
+  if (!y || !m || !d) return null
+  const years = now.getFullYear() - y
+  if (years > 0 && now.getMonth() === m - 1 && now.getDate() === d) return `🎉 ¡Hoy hacéis ${years} ${years === 1 ? 'año' : 'años'} juntos!`
+  const days = Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(y, m - 1, d)) / 86_400_000)
+  if (days > 0 && days % 100 === 0) return `💞 ¡Hoy hacéis ${days.toLocaleString('es-ES', { useGrouping: 'always' })} días juntos!`
+  return null
 }

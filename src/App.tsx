@@ -9,6 +9,8 @@ import { toggleDone } from './services/plans'
 import { formatDue } from './lib/time'
 import type { Kind, Plan, PersonId } from './lib/types'
 import { KINDS } from './lib/kinds'
+import type { Idea } from './lib/ideas'
+import { setIdeaDone } from './services/ideas'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
@@ -30,7 +32,7 @@ export default function App() {
 }
 
 type Tab = 'agenda' | 'plans' | 'tasks' | 'shopping' | 'home' | 'settings'
-type Sheet = { mode: 'new'; kind?: Kind; date?: string } | { mode: 'edit'; id: string } | null
+type Sheet = { mode: 'new'; kind?: Kind; date?: string; idea?: Idea } | { mode: 'edit'; id: string } | null
 
 /** Tipo por defecto al pulsar + en cada pestaña. */
 const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', shopping: 'task', home: 'plan', settings: 'plan' }
@@ -126,7 +128,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       <header className="pt-safe sticky top-0 z-30 bg-cream/85 px-4 pb-3 backdrop-blur-xl">
         <div className="flex items-center gap-3 pt-2">
           {tab === 'home' && homeTitle ? (
-            <button onClick={() => history.back()} aria-label="Volver a Casa" className="grid size-12 shrink-0 place-items-center rounded-full bg-white shadow-sm active:scale-95">
+            <button onClick={() => history.back()} aria-label="Volver a Casa" className="grid size-12 shrink-0 place-items-center rounded-full bg-surface shadow-sm active:scale-95">
               <ChevronIcon className="size-5 rotate-180" />
             </button>
           ) : (
@@ -136,14 +138,14 @@ function Home({ user, me }: { user: User; me: PersonId }) {
               className="relative shrink-0 rounded-full active:scale-95"
             >
               <Avatar mode={me} size="lg" />
-              <span className="absolute -bottom-0.5 -right-0.5 grid size-5 place-items-center rounded-full bg-white text-ink shadow">
+              <span className="absolute -bottom-0.5 -right-0.5 grid size-5 place-items-center rounded-full bg-surface text-ink shadow">
                 <SlidersIcon className="size-3" />
               </span>
             </button>
           )}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">
-              {tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : tab === 'home' && homeTitle ? 'Casa · MEROE' : 'Vuestro espacio'}
+              {tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : tab === 'home' && homeTitle ? (homeTitle === 'La gata' ? 'Casa' : 'Casa · MEROE') : 'Vuestro espacio'}
             </p>
             <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{tab === 'home' && homeTitle ? homeTitle : TAB_TITLE[tab]}</h1>
           </div>
@@ -163,6 +165,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             loading={sync.loading}
             onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
+            onMakePlan={(idea) => openSheet({ mode: 'new', kind: 'plan', idea })}
+            onError={setToast}
           />
         ) : tab === 'agenda' ? (
           <CalendarView
@@ -197,7 +201,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       </div>}
 
       {/* Barra inferior */}
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-white/85 backdrop-blur-xl">
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-surface/85 backdrop-blur-xl">
         <div className="mx-auto grid max-w-lg grid-cols-5 px-1 pt-2">
           <NavButton active={tab === 'agenda'} onClick={() => setTab('agenda')} icon={<CalendarIcon className="size-6" />} label="Agenda" />
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
@@ -209,10 +213,14 @@ function Home({ user, me }: { user: User; me: PersonId }) {
 
       {sheet && (sheet.mode === 'new' || editing) && (
         <PlanForm
-          key={sheet.mode === 'edit' ? sheet.id : `new-${sheet.kind ?? ''}-${sheet.date ?? ''}`}
+          key={sheet.mode === 'edit' ? sheet.id : `new-${sheet.kind ?? ''}-${sheet.date ?? ''}-${sheet.idea?.id ?? ''}`}
           plan={editing}
           defaultKind={sheet.mode === 'new' ? sheet.kind : undefined}
           defaultDate={sheet.mode === 'new' ? sheet.date : undefined}
+          prefill={sheet.mode === 'new' && sheet.idea ? { title: sheet.idea.title, place: sheet.idea.place, notes: sheet.idea.notes } : undefined}
+          onSaved={() => {
+            if (sheet.mode === 'new' && sheet.idea) setIdeaDone(sheet.idea.id, true).catch((e: Error) => setToast(e.message))
+          }}
           siblings={siblings}
           me={me}
           tags={tags}
@@ -223,7 +231,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       )}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-44 z-[60] mx-auto max-w-sm animate-fade-in rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-xl" role="alert">
+        <div className="fixed inset-x-4 bottom-44 z-[60] mx-auto max-w-sm animate-fade-in rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-cream shadow-xl" role="alert">
           {toast}
         </div>
       )}
@@ -253,7 +261,7 @@ function SyncBadge({ offline, pending }: { offline: boolean; pending: boolean })
     )
   }
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-emerald-600 shadow-sm" title="Sincronizado en tiempo real">
+    <span className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-emerald-600 shadow-sm" title="Sincronizado en tiempo real">
       <span className="relative flex size-2">
         <span className={`absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75 ${pending ? 'animate-ping' : ''}`} />
         <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />

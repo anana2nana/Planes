@@ -10,6 +10,9 @@ import { ColorPicker } from './ColorPicker'
 import { LogoutIcon, PlusIcon, TrashIcon } from './Icons'
 import { NotificationsSection } from './NotificationsSection'
 import { ErrorBoundary } from './ErrorBoundary'
+import { CalendarSection } from './CalendarSection'
+import { saveCoupleSince, useCouple } from '../hooks/useCouple'
+import { daysTogether } from '../lib/couple'
 
 interface Props {
   user: User
@@ -30,6 +33,14 @@ export function SettingsView({ user, me, tags, plans, priorities, onError }: Pro
         <ErrorBoundary inline>
           <NotificationsSection me={me} onError={onError} />
         </ErrorBoundary>
+      </Section>
+
+      <Section title="Nosotros">
+        <CoupleRow onError={onError} />
+      </Section>
+
+      <Section title="Google Calendar" hint="Ver la agenda allí">
+        <CalendarSection me={me} onError={onError} />
       </Section>
 
       <Section title="Prioridades" hint="Toca el color para cambiarlo">
@@ -84,7 +95,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted">{title}</h2>
         {hint && <span className="text-xs text-muted">{hint}</span>}
       </div>
-      <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">{children}</div>
+      <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">{children}</div>
     </section>
   )
 }
@@ -215,7 +226,7 @@ function NewTagRow({ onCreate }: { onCreate: (name: string, color: string) => vo
           placeholder="Nueva etiqueta…"
           className="min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-medium placeholder:text-stone-300"
         />
-        <button type="submit" disabled={!name.trim()} className="grid size-8 place-items-center rounded-full bg-ink text-white disabled:opacity-20" aria-label="Crear etiqueta">
+        <button type="submit" disabled={!name.trim()} className="grid size-8 place-items-center rounded-full bg-ink text-cream disabled:opacity-20" aria-label="Crear etiqueta">
           <PlusIcon className="size-4" />
         </button>
       </form>
@@ -225,5 +236,30 @@ function NewTagRow({ onCreate }: { onCreate: (name: string, color: string) => vo
         </div>
       )}
     </div>
+  )
+}
+
+function CoupleRow({ onError }: { onError: (msg: string) => void }) {
+  const { since } = useCouple()
+  return (
+    <label className="flex items-center gap-3 px-4 py-3">
+      <span className="text-2xl" aria-hidden>
+        💞
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Juntos desde</span>
+        <span className="text-xs text-muted">
+          {since ? `${daysTogether(since).toLocaleString('es-ES', { useGrouping: 'always' })} días · os felicitaremos en el aniversario` : 'Para el contador y felicitaros los días especiales'}
+        </span>
+      </span>
+      <input
+        type="date"
+        value={since ?? ''}
+        max={new Date().toISOString().slice(0, 10)}
+        onChange={(e) => saveCoupleSince(e.target.value || null).catch((err: Error) => onError(err.message))}
+        aria-label="Juntos desde"
+        className="h-10 shrink-0 rounded-xl border border-stone-200 bg-surface px-2 text-sm font-semibold outline-none focus:border-both"
+      />
+    </label>
   )
 }

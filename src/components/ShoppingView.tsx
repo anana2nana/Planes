@@ -45,7 +45,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             e.preventDefault()
             add(text, effectiveSection)
           }}
-          className="flex items-center gap-2 rounded-2xl bg-white p-1.5 pl-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.12)] focus-within:ring-2 focus-within:ring-both/40"
+          className="flex items-center gap-2 rounded-2xl bg-surface p-1.5 pl-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.12)] focus-within:ring-2 focus-within:ring-both/40"
         >
           <input
             value={text}
@@ -56,7 +56,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             autoComplete="off"
             className="h-11 min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-medium placeholder:text-stone-300"
           />
-          <button type="submit" disabled={!text.trim()} aria-label="Añadir" className="grid size-11 shrink-0 place-items-center rounded-xl bg-ink text-white transition active:scale-90 disabled:opacity-20">
+          <button type="submit" disabled={!text.trim()} aria-label="Añadir" className="grid size-11 shrink-0 place-items-center rounded-xl bg-ink text-cream transition active:scale-90 disabled:opacity-20">
             <PlusIcon className="size-5" strokeWidth={2.5} />
           </button>
         </form>
@@ -70,7 +70,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
                 role="radio"
                 aria-checked={active}
                 onClick={() => setSection(s)}
-                className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition active:scale-95 ${active ? 'bg-ink text-white' : 'bg-white text-ink shadow-sm'}`}
+                className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition active:scale-95 ${active ? 'bg-ink text-cream' : 'bg-surface text-ink shadow-sm'}`}
               >
                 <span aria-hidden>{SECTIONS[s].emoji}</span> {SECTIONS[s].label}
               </button>
@@ -89,7 +89,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
       </div>
 
       {loading ? (
-        <div className="h-24 animate-pulse rounded-3xl bg-white/70" />
+        <div className="h-24 animate-pulse rounded-3xl bg-surface/70" />
       ) : pending.length === 0 ? (
         <div className="py-10 text-center">
           <div className="text-5xl">🧺</div>
@@ -102,7 +102,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">
               {SECTIONS[g.id].emoji} {SECTIONS[g.id].label} <span className="opacity-60">· {g.items.length}</span>
             </h2>
-            <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+            <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
               {g.items.map((i) => (
                 <Row key={i.id} item={i} me={me} />
               ))}
@@ -120,7 +120,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
               <button
                 key={f.key}
                 onClick={() => add(f.name, f.section)}
-                className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-semibold shadow-sm transition active:scale-95"
+                className="flex items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-sm font-semibold shadow-sm transition active:scale-95"
               >
                 <span aria-hidden className="text-xs">
                   {SECTIONS[f.section].emoji}
@@ -142,13 +142,13 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             </button>
             <button
               onClick={() => clearBought(items).catch((e: Error) => onToast(e.message))}
-              className="rounded-full bg-white px-3 py-1 text-xs font-bold text-rose-600 shadow-sm active:scale-95"
+              className="rounded-full bg-surface px-3 py-1 text-xs font-bold text-rose-600 shadow-sm active:scale-95"
             >
               Vaciar comprados
             </button>
           </div>
           {showBought && (
-            <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white/70">
+            <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface/70">
               {bought.map((i) => (
                 <Row key={i.id} item={i} me={me} />
               ))}

@@ -27,7 +27,7 @@ export function PlanCard({ plan, me, tagsById, priorities, siblings, onOpen, onT
 
   return (
     <article
-      className={`group relative flex gap-3 overflow-hidden rounded-3xl bg-white p-3.5 pl-4 shadow-[0_1px_2px_rgba(42,34,51,0.04),0_4px_16px_-6px_rgba(42,34,51,0.08)] transition ${
+      className={`group relative flex gap-3 overflow-hidden rounded-3xl bg-surface p-3.5 pl-4 shadow-[0_1px_2px_rgba(42,34,51,0.04),0_4px_16px_-6px_rgba(42,34,51,0.08)] transition ${
         plan.done ? 'opacity-60' : ''
       }`}
     >

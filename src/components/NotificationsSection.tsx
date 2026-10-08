@@ -76,7 +76,7 @@ export function NotificationsSection({ me, onError }: { me: PersonId; onError: (
             onClick={() => run(on ? disablePush : () => enablePush(me))}
             disabled={busy}
             className={`shrink-0 rounded-xl px-3 py-2 text-sm font-bold transition active:scale-95 disabled:opacity-50 ${
-              on ? 'bg-stone-100 text-ink' : 'bg-ink text-white'
+              on ? 'bg-stone-100 text-ink' : 'bg-ink text-cream'
             }`}
           >
             {on ? 'Desactivar' : 'Activar'}
@@ -147,7 +147,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
     <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
       <span className="min-w-0 flex-1 text-sm font-semibold">{label}</span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-200 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:size-6 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
+      <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-200 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:size-6 after:rounded-full after:bg-surface after:shadow after:transition peer-checked:after:translate-x-5" />
     </label>
   )
 }

@@ -23,6 +23,12 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
   - *Plan de pagos*: precio + IVA (si sube, todo se recalcula), hitos en % o en euros, cuotas mensuales que se marcan solas el día de cobro (con ajuste manual), gastos de compra, muebles y ventas de Wallapop, barras por categoría y vista "Total / Cada uno".
   - *Hipoteca*: simulador fija / variable / mixta con el Euríbor del BCE actualizado a diario, escenarios ±1 punto y gráfico del capital pendiente.
   - *¿Llegamos?*: dinero de cada uno, ahorro mensual y previsión hasta la entrega con semáforo.
+- **💡 Algún día**: ideas sin fecha (restaurantes, escapadas, pelis) y la ruleta **¿Qué hacemos hoy?**, que elige una y la convierte en plan.
+- **🐱 La gata**: ficha (chip, veterinario con botón de llamar, peso con gráfico) y cuidados periódicos (vacuna, pipeta…) con aviso la víspera.
+- **🧾 Muebles**: presupuesto por categoría con barra y fotos de tickets y facturas en cada gasto.
+- **📆 Google Calendar**: enlace secreto (Ajustes) para ver las citas, planes y tareas en Google Calendar.
+- **💞 Contador** de días juntos y felicitación en el aniversario y cada 100 días.
+- **🌙 Modo oscuro** automático, según el del móvil.
 - **Notificaciones push** (también con la app cerrada):
   - cuando el otro te asigna un plan, crea uno para los dos o completa algo;
   - recordatorios antes de la fecha tope (a la hora, 15 min, 1 h, 3 h, 1 día: cada uno elige los suyos en *Ajustes*);
@@ -122,4 +128,8 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 | `tags/{id}` | `name, color` |
 | `config/priorities` | `{ urgent \| high \| medium \| low: { label, color } }` |
 | `config/notifications` | `{ nita \| kitos: { activity, reminders, leads[] } }` |
+| `ideas/{id}` | `title, category, place, notes, done, addedBy` |
+| `receipts/{id}` | `itemId, dataUrl (JPEG comprimido), addedBy` |
+| `pet/profile` · `petCare/{id}` | ficha de la gata · `title, every {n, unit}, last, history[]` |
+| `config/couple` · `config/calendar` | `since` · `token` (enlace secreto del calendario) |
 | `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |

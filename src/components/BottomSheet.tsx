@@ -27,8 +27,8 @@ export function BottomSheet({ open, onClose, title, children, footer }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
-      <button aria-label="Cerrar" onClick={onClose} className="absolute inset-0 animate-fade-in bg-ink/40 backdrop-blur-[2px]" />
-      <div className="relative flex max-h-[92dvh] w-full max-w-lg animate-sheet-in flex-col rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]">
+      <button aria-label="Cerrar" onClick={onClose} className="absolute inset-0 animate-fade-in bg-black/40 backdrop-blur-[2px]" />
+      <div className="relative flex max-h-[92dvh] w-full max-w-lg animate-sheet-in flex-col rounded-t-[28px] bg-surface shadow-2xl sm:rounded-[28px]">
         <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-stone-200 sm:hidden" />
         <header className="flex items-center justify-between px-5 pb-2 pt-3">
           <h2 className="text-lg font-bold">{title}</h2>

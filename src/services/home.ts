@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '../lib/firebase'
 import type { Fund, HomeConfig, HomeItem } from '../lib/home'
@@ -10,6 +10,8 @@ const configRef = doc(db, 'home', 'meroe')
 
 /** Guarda (fusionando) parte de la configuración. */
 export function saveHomeConfig(patch: Partial<HomeConfig>) {
+  // Los presupuestos se sustituyen enteros (con merge, quitar uno no lo borraría).
+  if (patch.budgets) return updateDoc(configRef, { ...patch, updatedAt: serverTimestamp() })
   return setDoc(configRef, { ...patch, updatedAt: serverTimestamp() }, { merge: true })
 }
 
@@ -29,7 +31,14 @@ export function saveHomeItem(item: Partial<HomeItem> & { id?: string }, me: Pers
   return setDoc(ref, { ...data, updatedAt: serverTimestamp(), updatedBy: me, ...(id ? {} : { createdAt: serverTimestamp(), order: Date.now() / 1e6 }) }, { merge: true })
 }
 
-export const deleteHomeItem = (id: string) => deleteDoc(doc(itemsCol, id))
+/** Borra un gasto y las fotos de sus tickets. */
+export async function deleteHomeItem(id: string) {
+  const receipts = await getDocs(query(collection(db, 'receipts'), where('itemId', '==', id)))
+  const batch = writeBatch(db)
+  receipts.docs.forEach((d) => batch.delete(d.ref))
+  batch.delete(doc(itemsCol, id))
+  await batch.commit()
+}
 
 export function saveFund(fund: Partial<Fund> & { id?: string }, me: PersonId) {
   const { id, updatedAt: _ignored, ...data } = fund

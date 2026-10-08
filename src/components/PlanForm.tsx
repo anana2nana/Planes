@@ -16,6 +16,10 @@ interface Props {
   defaultKind?: Kind
   /** Fecha (yyyy-mm-dd) para algo nuevo, p. ej. al crearlo desde el calendario. */
   defaultDate?: string
+  /** Datos de partida para algo nuevo (p. ej. desde una idea de "Algún día"). */
+  prefill?: Pick<PlanDraft, 'title' | 'place' | 'notes'>
+  /** Se llama al guardar (crear o cambiar). */
+  onSaved?: () => void
   siblings: Plan[]
   me: PersonId
   tags: Tag[]
@@ -24,7 +28,7 @@ interface Props {
   onError: (msg: string) => void
 }
 
-function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string): PlanDraft {
+function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string, prefill?: Props['prefill']): PlanDraft {
   if (!plan) {
     return {
       kind,
@@ -40,6 +44,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string): Plan
       rotate: false,
       remindWeekBefore: false,
       place: null,
+      ...prefill,
     }
   }
   return {
@@ -74,8 +79,8 @@ function quickDates() {
   ]
 }
 
-export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me, tags, priorities, onClose, onError }: Props) {
-  const [initial] = useState<PlanDraft>(() => initialDraft(plan, defaultKind, defaultDate))
+export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onSaved, siblings, me, tags, priorities, onClose, onError }: Props) {
+  const [initial] = useState<PlanDraft>(() => initialDraft(plan, defaultKind, defaultDate, prefill))
   const [draft, setDraft] = useState<PlanDraft>(initial)
   const [confirmDelete, setConfirmDelete] = useState(false)
   // Al abrir algo ya creado no se muestra "Guardar" hasta que se cambia algo.
@@ -105,6 +110,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
     if (!canSave) return
     const op = plan ? updatePlan(plan, draft, siblings) : createPlan(draft, me)
     op.catch((e: Error) => onError(`No se pudo guardar: ${e.message}`))
+    onSaved?.()
     onClose()
   }
 
@@ -119,7 +125,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
         type="submit"
         form="plan-form"
         disabled={!canSave}
-        className="h-13 w-full animate-fade-in rounded-2xl bg-ink text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-30"
+        className="h-13 w-full animate-fade-in rounded-2xl bg-ink text-base font-bold text-cream transition active:scale-[0.98] disabled:opacity-30"
       >
         {isEdit ? 'Guardar cambios' : draft.mode === 'duplicate' ? 'Crear para los dos' : `Crear ${kind.one.toLowerCase()}`}
       </button>
@@ -145,7 +151,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
               aria-checked={draft.kind === k}
               onClick={() => setKind(k)}
               className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-bold transition ${
-                draft.kind === k ? 'bg-white shadow-sm' : 'text-muted'
+                draft.kind === k ? 'bg-surface shadow-sm' : 'text-muted'
               }`}
             >
               <span aria-hidden>{KINDS[k].emoji}</span> {KINDS[k].one}
@@ -191,7 +197,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
                 type="button"
                 onClick={() => set('dueDate', q.value)}
                 className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${
-                  draft.dueDate === q.value ? 'bg-ink text-white' : 'bg-stone-100 text-ink'
+                  draft.dueDate === q.value ? 'bg-ink text-cream' : 'bg-stone-100 text-ink'
                 }`}
               >
                 {q.label}
@@ -213,7 +219,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
               value={draft.dueDate}
               aria-label="Fecha"
               onChange={(e) => set('dueDate', e.target.value)}
-              className="h-12 min-w-0 rounded-2xl border border-stone-200 bg-white px-3 font-semibold outline-none focus:border-both"
+              className="h-12 min-w-0 rounded-2xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both"
             />
             <input
               type="time"
@@ -221,7 +227,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
               aria-label="Hora"
               disabled={!draft.dueDate}
               onChange={(e) => set('dueTime', e.target.value)}
-              className="h-12 w-32 rounded-2xl border border-stone-200 bg-white px-3 font-semibold outline-none focus:border-both disabled:opacity-40"
+              className="h-12 w-32 rounded-2xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both disabled:opacity-40"
             />
           </div>
           {isEvent && !draft.dueDate && <p className="mt-1.5 text-xs text-muted">Las citas necesitan un día.</p>}
@@ -297,7 +303,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
             onChange={(e) => set('notes', e.target.value)}
             rows={3}
             placeholder={isEvent ? 'Dirección, qué llevar, idea de regalo…' : 'Dirección, enlaces, lo que haga falta…'}
-            className="w-full resize-none rounded-2xl border border-stone-200 bg-white px-3 py-2.5 outline-none focus:border-both"
+            className="w-full resize-none rounded-2xl border border-stone-200 bg-surface px-3 py-2.5 outline-none focus:border-both"
           />
         </Field>
 
@@ -375,7 +381,7 @@ function RepeatPicker({
   const repeats = yearly || days.length > 0
   const next = due && repeats ? nextOccurrence(due, repeat, due) : null
   const chip = (active: boolean) =>
-    `shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${active ? 'bg-ink text-white' : 'bg-stone-100 text-ink'}`
+    `shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${active ? 'bg-ink text-cream' : 'bg-stone-100 text-ink'}`
 
   return (
     <div className="space-y-3">
@@ -448,7 +454,7 @@ function Toggle({
         {hint && <span className="mt-0.5 block text-xs text-muted">{hint}</span>}
       </span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-200 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:size-6 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
+      <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-200 transition peer-checked:bg-emerald-500 after:absolute after:left-0.5 after:top-0.5 after:size-6 after:rounded-full after:bg-surface after:shadow after:transition peer-checked:after:translate-x-5" />
     </label>
   )
 }

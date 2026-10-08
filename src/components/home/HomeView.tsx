@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useHome } from '../../hooks/useHome'
+import { usePet } from '../../hooks/usePet'
 import { useSheetState } from '../../hooks/useSheetState'
-import { eur, forecast, formatMonth, handover, itemTotals, monthKey, monthsBetween, nextPayment, totalPrice, type CategoryId, type HomeItem } from '../../lib/home'
+import { daysUntil, nextDue } from '../../lib/pet'
+import { CATEGORIES, eur, forecast, formatMonth, handover, itemTotals, monthKey, monthsBetween, nextPayment, totalPrice, type CategoryId, type HomeItem } from '../../lib/home'
 import { simulate } from '../../lib/mortgage'
 import type { PersonId } from '../../lib/types'
 import { saveHomeConfig } from '../../services/home'
@@ -12,12 +14,13 @@ import { HomeSetup } from './HomeSetup'
 import { ItemForm } from './ItemForm'
 import { MortgageView } from './MortgageView'
 import { PaymentsView } from './PaymentsView'
+import { PetView } from './PetView'
 import { SavingsView } from './SavingsView'
 import { Label, NumberField, Segmented } from './ui'
 
-type Section = 'pagos' | 'hipoteca' | 'llegamos'
+type Section = 'pagos' | 'hipoteca' | 'llegamos' | 'gata'
 
-const SECTION_TITLE: Record<Section, string> = { pagos: 'Plan de pagos', hipoteca: 'Hipoteca', llegamos: '¿Llegamos?' }
+const SECTION_TITLE: Record<Section, string> = { pagos: 'Plan de pagos', hipoteca: 'Hipoteca', llegamos: '¿Llegamos?', gata: 'La gata' }
 
 const PER_PERSON_KEY = 'nitakitos.home.perPerson'
 const readPerPerson = () => {
@@ -32,7 +35,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
   const { loading, config, items, funds, euribor } = useHome()
   const [section, setSection] = useState<Section | null>(() => (history.state?.casa as Section) ?? null)
   const [perPerson, setPerPerson] = useState(readPerPerson)
-  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; item: HomeItem | null; category?: CategoryId } | { type: 'config' }>()
+  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; item: HomeItem | null; category?: CategoryId } | { type: 'config' } | { type: 'budgets' }>()
 
   // Cada espacio ocupa una entrada del historial: el "atrás" de Android vuelve a la portada.
   const open = useCallback((s: Section) => {
@@ -59,8 +62,15 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
   }
   const money = useCallback((v: number) => eur(perPerson ? v / 2 : v), [perPerson])
 
-  if (loading) return <div className="h-40 animate-pulse rounded-3xl bg-white/70" />
-  if (!config) return <HomeSetup onError={onError} />
+  if (loading) return <div className="h-40 animate-pulse rounded-3xl bg-surface/70" />
+  if (section === 'gata') return <PetView onError={onError} />
+  if (!config)
+    return (
+      <div className="space-y-4">
+        <AtHome onOpen={() => open('gata')} />
+        <HomeSetup onError={onError} />
+      </div>
+    )
 
   const now = new Date()
   const spending = items.filter((i) => !i.income)
@@ -72,6 +82,10 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
   const euriborValue = config.mortgage.manualEuribor ?? euribor?.value ?? 0
   const mortgage = simulate(Math.min(h.remaining, config.basePrice * config.mortgage.pct), config.mortgage, euriborValue)
   const f = forecast(items, funds, config, now)
+  // Muebles, electrodomésticos y reformas: gastado frente a presupuesto.
+  const FURNITURE: CategoryId[] = ['muebles', 'electro', 'reforma']
+  const furnitureSpent = items.filter((i) => FURNITURE.includes(i.category) && !i.income).reduce((s, i) => s + itemTotals(i, config, now).total, 0)
+  const furnitureBudget = FURNITURE.reduce((s, c) => s + (config.budgets?.[c] ?? 0), 0)
 
   const toggle = (
     <Segmented
@@ -91,6 +105,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
         <ItemForm item={sheet.item} defaultCategory={sheet.category} config={config} me={me} onClose={closeSheet} onError={onError} />
       )}
       {sheet?.type === 'config' && <ConfigSheet config={config} onClose={closeSheet} onError={onError} />}
+      {sheet?.type === 'budgets' && <BudgetsSheet config={config} onClose={closeSheet} onError={onError} />}
     </>
   )
 
@@ -105,6 +120,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
             money={money}
             onEditItem={(item, category) => openSheet({ type: 'item', item, category })}
             onEditConfig={() => openSheet({ type: 'config' })}
+            onEditBudgets={() => openSheet({ type: 'budgets' })}
             onOpenMortgage={() => open('hipoteca')}
           />
         )}
@@ -131,7 +147,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
           <p className="tabular mt-3 text-3xl font-extrabold tracking-tight">{money(paid)}</p>
           <p className="text-sm opacity-90">pagado de {money(total)}</p>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/30">
-            <div className="h-full rounded-full bg-white" style={{ width: `${total ? Math.min(100, (paid / total) * 100) : 0}%` }} />
+            <div className="h-full rounded-full bg-surface" style={{ width: `${total ? Math.min(100, (paid / total) * 100) : 0}%` }} />
           </div>
           {next && (
             <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur-sm">
@@ -165,10 +181,25 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
             </>
           )}
         </Tile>
-        <Tile emoji="🛋️" title="Muebles" muted onClick={() => openSheet({ type: 'item', item: null, category: 'muebles' })}>
-          Cuando acabe la obra. Ya podéis apuntar gastos y ventas de Wallapop.
+        <Tile emoji="🛋️" title="Muebles" muted={furnitureBudget === 0 && furnitureSpent === 0} onClick={() => open('pagos')}>
+          {furnitureBudget > 0 ? (
+            <>
+              <b className="tabular text-ink">{money(furnitureSpent)}</b> de {money(furnitureBudget)}
+              <span className="mt-2 block">
+                <ProgressBar value={furnitureSpent} max={furnitureBudget} color={furnitureSpent > furnitureBudget ? '#e34948' : '#eda100'} label="Muebles: gastado del presupuesto" />
+              </span>
+            </>
+          ) : furnitureSpent > 0 ? (
+            <>
+              <b className="tabular text-ink">{money(furnitureSpent)}</b> gastado. Ponedle presupuesto en el plan de pagos.
+            </>
+          ) : (
+            'Cuando acabe la obra. Ya podéis apuntar gastos, ventas de Wallapop y presupuestos.'
+          )}
         </Tile>
       </div>
+
+      <AtHome onOpen={() => open('gata')} />
 
       <p className="px-2 text-center text-[11px] text-muted">
         Precio con IVA {money(totalPrice(config))} · todo se comparte en tiempo real entre los dos
@@ -178,11 +209,42 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
   )
 }
 
+/** Bloque "En casa": la gata (y en el futuro, más cosas del día a día). */
+function AtHome({ onOpen }: { onOpen: () => void }) {
+  const { profile, care } = usePet()
+  const today = new Date()
+  // Los que aún no tienen "última vez" no cuentan como atrasados (no sabemos cuándo tocan).
+  const due = care.filter((c) => c.last).map((c) => ({ c, days: daysUntil(nextDue(c, today), today) })).sort((a, b) => a.days - b.days)
+  const late = due.filter((d) => d.days <= 0).length
+  const first = due[0]
+  return (
+    <section>
+      <h2 className="mb-2 mt-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">En casa</h2>
+      <div className="grid grid-cols-2 gap-3">
+        <Tile emoji="🐱" title={profile?.name || 'La gata'} muted={!profile && care.length === 0} onClick={onOpen}>
+          {late > 0 ? (
+            <b className="text-rose-600">{late === 1 ? `Toca: ${first.c.title}` : `${late} cuidados pendientes`}</b>
+          ) : first ? (
+            <>
+              Próximo: <b className="text-ink">{first.c.title}</b>
+              <span className="block">{first.days === 1 ? 'mañana' : `en ${first.days} días`}</span>
+            </>
+          ) : care.length > 0 ? (
+            'Apunta cuándo fue la última vez de cada cuidado'
+          ) : (
+            'Vacunas, desparasitar, peso, veterinario…'
+          )}
+        </Tile>
+      </div>
+    </section>
+  )
+}
+
 function Tile({ emoji, title, children, onClick, muted }: { emoji: string; title: string; children: ReactNode; onClick: () => void; muted?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className={`flex min-h-36 flex-col rounded-3xl p-4 text-left shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)] transition active:scale-[0.98] ${muted ? 'bg-white/60' : 'bg-white'}`}
+      className={`flex min-h-36 flex-col rounded-3xl p-4 text-left shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)] transition active:scale-[0.98] ${muted ? 'bg-surface/60' : 'bg-surface'}`}
     >
       <span className="text-2xl" aria-hidden>
         {emoji}
@@ -212,7 +274,7 @@ function ConfigSheet({ config, onClose, onError }: { config: NonNullable<ReturnT
       onClose={onClose}
       title="El piso"
       footer={
-        <button onClick={save} disabled={!canSave} className="h-13 w-full rounded-2xl bg-ink font-bold text-white disabled:opacity-30">
+        <button onClick={save} disabled={!canSave} className="h-13 w-full rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
           Guardar
         </button>
       }
@@ -234,11 +296,51 @@ function ConfigSheet({ config, onClose, onError }: { config: NonNullable<ReturnT
               value={handoverMonth}
               onChange={(e) => e.target.value && setHandoverMonth(e.target.value)}
               aria-label="Mes de entrega"
-              className="h-12 w-full rounded-2xl border border-stone-200 bg-white px-3 font-semibold outline-none focus:border-both"
+              className="h-12 w-full rounded-2xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both"
             />
           </div>
         </div>
         <p className="text-xs text-muted">Si sube el precio, los pagos en % y lo que queda para la entrega se recalculan solos.</p>
+      </div>
+    </BottomSheet>
+  )
+}
+
+/** Presupuesto por categoría (lo que pensáis gastar en muebles, electrodomésticos…). */
+function BudgetsSheet({ config, onClose, onError }: { config: NonNullable<ReturnType<typeof useHome>['config']>; onClose: () => void; onError: (m: string) => void }) {
+  const EDITABLE: CategoryId[] = ['muebles', 'electro', 'reforma', 'compra', 'impuestos', 'otros']
+  const [values, setValues] = useState<Partial<Record<CategoryId, number | null>>>(() => ({ ...config.budgets }))
+  const save = () => {
+    const budgets: Partial<Record<CategoryId, number>> = {}
+    EDITABLE.forEach((c) => {
+      const v = values[c]
+      if (v && v > 0) budgets[c] = v
+    })
+    // Se guarda entero (sin fusionar) para que borrar un presupuesto lo quite de verdad.
+    saveHomeConfig({ budgets }).catch((e: Error) => onError(e.message))
+    onClose()
+  }
+  return (
+    <BottomSheet
+      open
+      onClose={onClose}
+      title="Presupuestos"
+      footer={
+        <button onClick={save} className="h-13 w-full rounded-2xl bg-ink font-bold text-cream">
+          Guardar
+        </button>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-muted">Lo que pensáis gastar en cada cosa. Deja vacío lo que no quieras controlar.</p>
+        {EDITABLE.map((c) => (
+          <div key={c} className="flex items-center gap-3">
+            <span className="w-40 shrink-0 text-sm font-semibold">
+              {CATEGORIES[c].emoji} {CATEGORIES[c].label}
+            </span>
+            <NumberField value={values[c] ?? null} onChange={(v) => setValues((x) => ({ ...x, [c]: v }))} suffix="€" label={`Presupuesto de ${CATEGORIES[c].label}`} className="flex-1" />
+          </div>
+        ))}
       </div>
     </BottomSheet>
   )

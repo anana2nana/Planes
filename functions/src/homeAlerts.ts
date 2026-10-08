@@ -2,6 +2,7 @@
 // Usa src/home.ts, copia exacta de la app (un test lo comprueba).
 
 import { eur, installmentDate, paidInstallments, unitAmount, type Fund, type HomeConfig, type HomeItem } from './home.js'
+import { daysUntil, nextDue, type CareItem } from './pet.js'
 import { NAME, type NotifPrefs, type Person, type Push } from './logic.js'
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -70,4 +71,22 @@ export function homePushes(
     }
   }
   return pushes
+}
+
+/** Cuidados de la gata que tocan mañana (o que llevan días pendientes, una vez por semana). */
+export function petPushes(care: CareItem[], petName: string, prefs: Record<Person, NotifPrefs>, now: Date): Push[] {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  // Sin fecha de la última vez no sabemos cuándo toca: no se avisa (si no, sonaría cada semana).
+  const due = care.filter((c) => {
+    if (!c.last) return false
+    const d = daysUntil(nextDue(c, today), today)
+    return d === 1 || (d <= 0 && d % 7 === 0)
+  })
+  if (due.length === 0) return []
+  const name = petName.trim() || 'la gata'
+  const late = due.filter((c) => daysUntil(nextDue(c, today), today) <= 0)
+  const title = late.length === due.length ? `🐱 Pendiente con ${name}` : `🐱 Mañana toca con ${name}`
+  const body = due.map((c) => `${c.title}${late.includes(c) ? ' (pendiente)' : ''}`).join('\n')
+  const people: Person[] = ['nita', 'kitos']
+  return people.filter((p) => prefs[p].home).map((p) => ({ to: p, kind: 'reminder' as const, title, body: `${body}\nMárcalo en Casa → ${name} cuando esté hecho.`, tag: 'pet-care' }))
 }

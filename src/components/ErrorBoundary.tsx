@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, { error: Error | null }> {
         </pre>
         <button
           onClick={() => location.reload()}
-          className="mt-4 rounded-xl bg-ink px-4 py-2 text-sm font-bold text-white active:scale-95"
+          className="mt-4 rounded-xl bg-ink px-4 py-2 text-sm font-bold text-cream active:scale-95"
         >
           Recargar
         </button>

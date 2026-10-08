@@ -6,18 +6,21 @@ import { FieldValue, Timestamp, getFirestore, type DocumentSnapshot } from 'fire
 import { getMessaging } from 'firebase-admin/messaging'
 import { logger, setGlobalOptions } from 'firebase-functions/v2'
 import { onDocumentWritten } from 'firebase-functions/v2/firestore'
-import { HttpsError, onCall } from 'firebase-functions/v2/https'
+import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
 import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
-import { homePushes } from './homeAlerts.js'
+import { homePushes, petPushes } from './homeAlerts.js'
+import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
+import type { CareItem } from './pet.js'
 import type { Amount, CategoryId, Fund, HomeConfig, HomeItem, MonthlySchedule } from './home.js'
 import {
   LATE_GRACE_MIN,
   activityPushes,
   digestPush,
   normalizePrefs,
+  specialDay,
   reminderPushes,
   rolloverDue,
   type NotifPrefs,
@@ -214,8 +217,10 @@ export const dailyDigest = onSchedule({ schedule: '0 * * * *', timeZone: 'Europe
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   const snap = await db.collection('plans').where('done', '==', false).where('dueAt', '<', Timestamp.fromDate(endOfToday)).get()
   const plans = snap.docs.map((d) => toPlan(d)!)
+  const since = (await db.doc('config/couple').get()).get('since')
+  const extra = typeof since === 'string' ? specialDay(since, now) : null
   for (const person of people) {
-    const push = digestPush(person, plans, now.getTime())
+    const push = digestPush(person, plans, now.getTime(), extra)
     if (push) await send(push)
   }
 })
@@ -260,9 +265,19 @@ function parseHomeItem(id: string, x: Record<string, any>): HomeItem {
 
 /** Cada tarde a las 20:00: pagos de mañana y, el día 1, recordatorio de actualizar el ahorro. */
 export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Europe/Madrid' }, async () => {
-  const cfg = parseHome((await db.doc('home/meroe').get()).data())
+  const [cfgSnap, petSnap, careSnap, prefs] = await Promise.all([db.doc('home/meroe').get(), db.doc('pet/profile').get(), db.collection('petCare').get(), loadPrefs()])
+  const care: CareItem[] = careSnap.docs.map((d) => ({
+    id: d.id,
+    title: String(d.get('title') ?? ''),
+    every: d.get('every')?.n && d.get('every')?.unit ? d.get('every') : { n: 1, unit: 'month' },
+    last: typeof d.get('last') === 'string' ? d.get('last') : null,
+    history: [],
+  }))
+  for (const push of petPushes(care, String(petSnap.get('name') ?? ''), prefs, new Date())) await send(push)
+
+  const cfg = parseHome(cfgSnap.data())
   if (!cfg) return
-  const [itemsSnap, fundsSnap, prefs] = await Promise.all([db.collection('homeItems').get(), db.collection('homeFunds').get(), loadPrefs()])
+  const [itemsSnap, fundsSnap] = await Promise.all([db.collection('homeItems').get(), db.collection('homeFunds').get()])
   const items = itemsSnap.docs.map((d) => parseHomeItem(d.id, d.data()))
   const funds: Fund[] = fundsSnap.docs.map((d) => ({
     id: d.id,
@@ -272,4 +287,38 @@ export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Eur
     updatedAt: d.get('updatedAt') instanceof Timestamp ? (d.get('updatedAt') as Timestamp).toMillis() : null,
   }))
   for (const push of homePushes(items, funds, cfg, prefs, new Date())) await send(push)
+})
+
+/**
+ * Feed iCal para Google Calendar: https://…/calendarFeed?t=TOKEN[&who=nita|kitos].
+ * Es público (Google Calendar no inicia sesión), protegido por el token secreto de config/calendar.
+ */
+export const calendarFeed = onRequest({ invoker: 'public', maxInstances: 1 }, async (req, res) => {
+  const token = (await db.doc('config/calendar').get()).get('token')
+  if (typeof token !== 'string' || token.length < 20 || req.query.t !== token) {
+    res.status(404).send('Not found')
+    return
+  }
+  const who = req.query.who === 'nita' || req.query.who === 'kitos' ? req.query.who : null
+  // Desde hace 60 días en adelante (y las citas que se repiten, aunque su fecha guardada sea antigua).
+  const since = Timestamp.fromMillis(Date.now() - 60 * 86_400_000)
+  const [recent, events] = await Promise.all([
+    db.collection('plans').where('dueAt', '>=', since).get(),
+    db.collection('plans').where('kind', '==', 'event').get(),
+  ])
+  const byId = new Map<string, IcsPlan>()
+  for (const doc of [...recent.docs, ...events.docs]) {
+    const base = toPlan(doc)
+    if (!base || byId.has(doc.id)) continue
+    const place = doc.get('place')
+    byId.set(doc.id, {
+      ...base,
+      notes: String(doc.get('notes') ?? ''),
+      place: place && typeof place.name === 'string' ? { name: place.name, address: String(place.address ?? '') } : null,
+    })
+  }
+  const plans = feedPlans([...byId.values()].sort((a, b) => (a.dueMs ?? 0) - (b.dueMs ?? 0)), who)
+  res.set('Content-Type', 'text/calendar; charset=utf-8')
+  res.set('Cache-Control', 'private, max-age=300')
+  res.send(buildIcs(plans, Date.now(), who === 'nita' ? 'Nitakitos · Nita' : who === 'kitos' ? 'Nitakitos · Kitos' : 'Nitakitos'))
 })

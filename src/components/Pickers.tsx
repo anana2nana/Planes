@@ -139,7 +139,7 @@ export function TagPicker({ tags, value, onChange }: { tags: Tag[]; value: strin
                 }
               }}
               placeholder="Nombre de la etiqueta"
-              className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 outline-none focus:border-both"
+              className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-surface px-3 py-2 outline-none focus:border-both"
             />
             <button type="button" onClick={create} disabled={!name.trim()} className="rounded-xl px-4 font-bold text-white disabled:opacity-40" style={{ background: color }}>
               Crear

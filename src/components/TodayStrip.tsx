@@ -2,6 +2,8 @@ import { useNow } from '../hooks/useNow'
 import { eventEmoji } from '../lib/kinds'
 import type { Plan, PersonId } from '../lib/types'
 import { ChevronIcon } from './Icons'
+import { useCouple } from '../hooks/useCouple'
+import { daysTogether, specialDay } from '../lib/couple'
 
 const EMOJI = { plan: '💞', task: '🧹' }
 const timeFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' })
@@ -15,17 +17,27 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks }: { plans: Plan[]; me
   const today = mine.filter((p) => p.dueAt!.toMillis() >= start && p.dueAt!.toMillis() < end).sort((a, b) => a.dueAt!.toMillis() - b.dueAt!.toMillis())
   const overdue = mine.filter((p) => p.kind !== 'event' && p.dueAt!.toMillis() < start).length
   const MAX = 4
+  const { since } = useCouple()
+  const special = since ? specialDay(since, now) : null
 
   return (
     <section className="rounded-3xl bg-gradient-to-br from-amber-50 to-rose-50 p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
-      <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-amber-700">☀️ Hoy para ti</h2>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-amber-700">☀️ Hoy para ti</h2>
+        {since && (
+          <span className="tabular rounded-full bg-surface/70 px-2.5 py-0.5 text-[11px] font-bold text-rose-600">
+            💞 {daysTogether(since, now).toLocaleString('es-ES', { useGrouping: 'always' })} días juntos
+          </span>
+        )}
+      </div>
+      {special && <p className="mb-2 rounded-xl bg-surface/80 px-3 py-2 text-sm font-bold text-rose-700">{special}</p>}
       {today.length === 0 ? (
         <p className="text-sm text-muted">Nada apuntado para hoy 🌿</p>
       ) : (
         <ul className="space-y-1">
           {today.slice(0, MAX).map((p) => (
             <li key={p.id}>
-              <button onClick={() => onOpen(p)} className="flex w-full items-center gap-2.5 rounded-xl py-1 text-left active:bg-white/60">
+              <button onClick={() => onOpen(p)} className="flex w-full items-center gap-2.5 rounded-xl py-1 text-left active:bg-surface/60">
                 <span aria-hidden className="w-5 text-center">
                   {p.kind === 'event' ? eventEmoji(!!p.repeat?.yearly) : EMOJI[p.kind]}
                 </span>
@@ -38,7 +50,7 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks }: { plans: Plan[]; me
         </ul>
       )}
       {overdue > 0 && (
-        <button onClick={onGoTasks} className="mt-2 flex w-full items-center gap-1.5 rounded-xl bg-white/70 px-3 py-2 text-left text-xs font-bold text-rose-700 active:scale-[0.99]">
+        <button onClick={onGoTasks} className="mt-2 flex w-full items-center gap-1.5 rounded-xl bg-surface/70 px-3 py-2 text-left text-xs font-bold text-rose-700 active:scale-[0.99]">
           ⚠️ {overdue} {overdue === 1 ? 'pendiente atrasada' : 'pendientes atrasadas'}
           <ChevronIcon className="ml-auto size-3.5" />
         </button>

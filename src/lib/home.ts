@@ -17,6 +17,8 @@ export interface HomeConfig {
   mortgage: MortgageConfig
   /** Lo que ahorra cada uno al mes para la casa. */
   monthlySaving: { nita: number; kitos: number }
+  /** Presupuesto por categoría (muebles, electrodomésticos…), opcional. */
+  budgets?: Partial<Record<CategoryId, number>>
 }
 
 export interface MortgageConfig {

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
   CATEGORIES,
+  CATEGORY_ORDER,
   byCategory,
   formatMonth,
   handover,
@@ -27,6 +28,7 @@ export function PaymentsView({
   onEditItem,
   onEditConfig,
   onOpenMortgage,
+  onEditBudgets,
 }: {
   config: HomeConfig
   items: HomeItem[]
@@ -35,7 +37,9 @@ export function PaymentsView({
   onEditItem: (item: HomeItem | null, category?: CategoryId) => void
   onEditConfig: () => void
   onOpenMortgage: () => void
+  onEditBudgets: () => void
 }) {
+  const budgets = config.budgets ?? {}
   const now = new Date()
   const cats = byCategory(items, config, now)
   const h = handover(items, config, now)
@@ -87,13 +91,24 @@ export function PaymentsView({
 
       {/* Por categoría */}
       <section>
-        <SectionTitle>Por categoría</SectionTitle>
+        <SectionTitle
+          right={
+            <button onClick={onEditBudgets} className="text-xs font-bold text-both">
+              Presupuestos
+            </button>
+          }
+        >
+          Por categoría
+        </SectionTitle>
         <Card className="space-y-4">
-          {cats.map((c) => {
-            const meta = CATEGORIES[c.id]
-            const isIncome = c.id === 'wallapop'
+          {CATEGORY_ORDER.filter((id) => cats.some((c) => c.id === id) || budgets[id]).map((id) => {
+            const c = cats.find((x) => x.id === id) ?? { id, total: 0, paid: 0, pending: 0, count: 0 }
+            const meta = CATEGORIES[id]
+            const isIncome = id === 'wallapop'
+            const budget = budgets[id]
+            const over = budget ? c.total - budget : 0
             return (
-              <div key={c.id}>
+              <div key={id}>
                 <div className="mb-1.5 flex items-baseline justify-between gap-2 text-sm">
                   <span className="font-semibold">
                     <span aria-hidden>{meta.emoji}</span> {meta.label}
@@ -103,6 +118,10 @@ export function PaymentsView({
                       <>
                         <b className="text-ink">+{money(c.paid)}</b> cobrado
                       </>
+                    ) : budget ? (
+                      <>
+                        <b className={over > 0 ? 'text-rose-600' : 'text-ink'}>{money(c.total)}</b> de {money(budget)} presupuesto
+                      </>
                     ) : (
                       <>
                         <b className="text-ink">{money(c.paid)}</b> de {money(c.total)}
@@ -110,7 +129,16 @@ export function PaymentsView({
                     )}
                   </span>
                 </div>
-                <ProgressBar value={c.paid} max={c.total} color={meta.color} label={`${meta.label}: pagado`} />
+                {budget ? (
+                  <ProgressBar value={c.total} max={budget} color={over > 0 ? '#e34948' : meta.color} label={`${meta.label}: gastado del presupuesto`} />
+                ) : (
+                  <ProgressBar value={c.paid} max={c.total} color={meta.color} label={`${meta.label}: pagado`} />
+                )}
+                {budget && (
+                  <p className={`mt-1 text-[11px] font-semibold ${over > 0 ? 'text-rose-600' : 'text-muted'}`}>
+                    {over > 0 ? `⚠️ Os pasáis ${money(over)}` : `Quedan ${money(budget - c.total)} de presupuesto`}
+                  </p>
+                )}
               </div>
             )
           })}
@@ -126,7 +154,7 @@ export function PaymentsView({
             <p className="mb-3 text-xs text-muted">lo que queda del precio con IVA</p>
             <div className="flex h-3 overflow-hidden rounded-full" aria-hidden>
               <div className="h-full bg-[#2a78d6]" style={{ width: `${(h.financed / Math.max(1, h.remaining)) * 100}%` }} />
-              <div className="h-full w-0.5 bg-white" />
+              <div className="h-full w-0.5 bg-surface" />
               <div className="h-full flex-1 bg-[#eb6834]" />
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -150,7 +178,7 @@ export function PaymentsView({
           <SectionTitle>
             {CATEGORIES[c.id].emoji} {CATEGORIES[c.id].label}
           </SectionTitle>
-          <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+          <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
             {items
               .filter((i) => i.category === c.id)
               .map((i) => (

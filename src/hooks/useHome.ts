@@ -25,6 +25,7 @@ function parseConfig(d: Record<string, unknown> | undefined): HomeConfig | null 
     handover: typeof d.handover === 'string' ? d.handover : '2028-10',
     mortgage: { ...DEFAULT_MORTGAGE, ...m },
     monthlySaving: { nita: s.nita ?? 0, kitos: s.kitos ?? 0 },
+    budgets: typeof d.budgets === 'object' && d.budgets ? (d.budgets as HomeConfig['budgets']) : {},
   }
 }
 

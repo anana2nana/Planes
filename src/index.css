@@ -4,6 +4,8 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --color-cream: #fdf8f6;
+  /* Fondo de tarjetas y hojas (blanco; en modo oscuro, gris oscuro). */
+  --color-surface: #ffffff;
   --color-ink: #2a2233;
   --color-muted: #8a7f93;
 
@@ -35,6 +37,55 @@
 :root {
   color-scheme: light;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Modo oscuro automático (sigue el del móvil). Se redefinen los colores base y los
+   tonos pastel: los fondos claros (50/100) pasan a ser tintes oscuros y los textos
+   oscuros (700/800) se aclaran. Los degradados y botones de color se quedan igual. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-cream: #17131b;
+    --color-surface: #231d29;
+    --color-ink: #f3eef6;
+    --color-muted: #a69cb0;
+
+    --color-nita-soft: #4a1d2a;
+    --color-kitos-soft: #0f3346;
+    --color-both-soft: #2f2350;
+
+    --color-stone-50: #2a2330;
+    --color-stone-100: #332b3a;
+    --color-stone-200: #41384a;
+    --color-stone-300: #5b5165;
+    --color-stone-400: #7f7489;
+    --color-stone-500: #9a90a4;
+    --color-stone-600: #b8afc1;
+
+    --color-rose-50: color-mix(in oklab, oklch(64.5% 0.246 16.439) 16%, #231d29);
+    --color-rose-100: color-mix(in oklab, oklch(64.5% 0.246 16.439) 26%, #231d29);
+    --color-rose-700: oklch(81% 0.117 11.638);
+    --color-red-100: color-mix(in oklab, oklch(63.7% 0.237 25.331) 26%, #231d29);
+    --color-red-700: oklch(80.8% 0.114 19.571);
+    --color-amber-50: color-mix(in oklab, oklch(76.9% 0.188 70.08) 14%, #231d29);
+    --color-amber-100: color-mix(in oklab, oklch(76.9% 0.188 70.08) 24%, #231d29);
+    --color-amber-700: oklch(87.9% 0.169 91.605);
+    --color-amber-800: oklch(92.4% 0.12 95.746);
+    --color-orange-100: color-mix(in oklab, oklch(70.5% 0.213 47.604) 24%, #231d29);
+    --color-orange-700: oklch(83.7% 0.128 66.29);
+    --color-emerald-50: color-mix(in oklab, oklch(69.6% 0.17 162.48) 14%, #231d29);
+    --color-emerald-100: color-mix(in oklab, oklch(69.6% 0.17 162.48) 24%, #231d29);
+    --color-emerald-700: oklch(84.5% 0.143 164.978);
+    --color-sky-50: color-mix(in oklab, oklch(68.5% 0.169 237.323) 14%, #231d29);
+    --color-sky-100: color-mix(in oklab, oklch(68.5% 0.169 237.323) 24%, #231d29);
+    --color-sky-700: oklch(82.8% 0.111 230.318);
+    --color-blue-50: color-mix(in oklab, oklch(62.3% 0.214 259.815) 14%, #231d29);
+    --color-violet-50: color-mix(in oklab, oklch(60.6% 0.25 292.717) 16%, #231d29);
+    --color-violet-100: color-mix(in oklab, oklch(60.6% 0.25 292.717) 26%, #231d29);
+    --color-violet-200: color-mix(in oklab, oklch(60.6% 0.25 292.717) 36%, #231d29);
+    --color-violet-700: oklch(81.1% 0.111 293.571);
+    --color-indigo-50: color-mix(in oklab, oklch(58.5% 0.233 277.117) 16%, #231d29);
+  }
 }
 
 html,

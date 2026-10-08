@@ -125,7 +125,7 @@ export function HomeSetup({ onError }: { onError: (m: string) => void }) {
               value={handover}
               onChange={(e) => e.target.value && setHandover(e.target.value)}
               aria-label="Mes de entrega aproximado"
-              className="h-12 w-full rounded-2xl border border-stone-200 bg-white px-3 font-semibold outline-none focus:border-both"
+              className="h-12 w-full rounded-2xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both"
             />
           </div>
         </div>
@@ -187,7 +187,7 @@ export function HomeSetup({ onError }: { onError: (m: string) => void }) {
       <button
         onClick={create}
         disabled={!cfg || busy}
-        className="h-14 w-full rounded-2xl bg-ink text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-30"
+        className="h-14 w-full rounded-2xl bg-ink text-base font-bold text-cream transition active:scale-[0.98] disabled:opacity-30"
       >
         {cfg ? 'Crear el plan de MEROE' : 'Pon el precio para continuar'}
       </button>

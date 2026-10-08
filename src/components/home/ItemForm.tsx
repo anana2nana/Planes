@@ -16,6 +16,7 @@ import { deleteHomeItem, saveHomeItem } from '../../services/home'
 import { BottomSheet } from '../BottomSheet'
 import { TrashIcon } from '../Icons'
 import { Label, NumberField, Segmented, Stepper, Switch } from './ui'
+import { Receipts } from './Receipts'
 
 type Draft = Omit<HomeItem, 'id'> & { id?: string }
 
@@ -67,7 +68,7 @@ export function ItemForm({
           <TrashIcon className="size-5" />
         </button>
       )}
-      <button onClick={save} disabled={!canSave} className="h-13 flex-1 rounded-2xl bg-ink font-bold text-white disabled:opacity-30">
+      <button onClick={save} disabled={!canSave} className="h-13 flex-1 rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
         {item ? 'Guardar' : d.income ? 'Añadir ingreso' : 'Añadir gasto'}
       </button>
     </div>
@@ -121,7 +122,7 @@ export function ItemForm({
                     }))
                   }
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition active:scale-95 ${
-                    active ? 'bg-ink text-white' : 'bg-stone-100 text-ink'
+                    active ? 'bg-ink text-cream' : 'bg-stone-100 text-ink'
                   }`}
                 >
                   <span aria-hidden>{CATEGORIES[c].emoji}</span>
@@ -178,7 +179,7 @@ export function ItemForm({
                 value={d.date ?? ''}
                 onChange={(e) => set('date', e.target.value || null)}
                 aria-label="Fecha"
-                className="h-12 w-full rounded-2xl border border-stone-200 bg-white px-3 font-semibold outline-none focus:border-both"
+                className="h-12 w-full rounded-2xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both"
               />
               <Switch label={d.income ? 'Ya cobrado' : 'Ya pagado'} checked={d.paid} onChange={(v) => set('paid', v)} />
             </>
@@ -195,12 +196,21 @@ export function ItemForm({
         )}
 
         <div>
+          <Label>Tickets y facturas</Label>
+          {item ? (
+            <Receipts itemId={item.id} me={me} onError={onError} />
+          ) : (
+            <p className="text-xs text-muted">Guarda primero el gasto y luego podrás añadir fotos del ticket.</p>
+          )}
+        </div>
+
+        <div>
           <Label>Notas</Label>
           <textarea
             value={d.notes}
             onChange={(e) => set('notes', e.target.value)}
             rows={2}
-            className="w-full resize-none rounded-2xl border border-stone-200 bg-white px-3 py-2.5 outline-none focus:border-both"
+            className="w-full resize-none rounded-2xl border border-stone-200 bg-surface px-3 py-2.5 outline-none focus:border-both"
           />
         </div>
       </div>
@@ -232,7 +242,7 @@ function MonthlyEditor({ d, setMonthly, unit }: { d: Draft; setMonthly: (m: NonN
             value={m.start}
             onChange={(e) => e.target.value && setMonthly({ ...m, start: e.target.value })}
             aria-label="Mes de la primera cuota"
-            className="h-12 w-full rounded-2xl border border-stone-200 bg-white px-2 text-sm font-semibold outline-none focus:border-both"
+            className="h-12 w-full rounded-2xl border border-stone-200 bg-surface px-2 text-sm font-semibold outline-none focus:border-both"
           />
         </div>
       </div>

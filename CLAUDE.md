@@ -26,16 +26,22 @@ Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (
 - `src/services/plans.ts` — todas las escrituras. No se espera a `commit()` en la UI (funciona offline).
 - `src/components/` — `CalendarView` (Agenda), `PlansView` (listas de planes/tareas), `PlanForm`, `PlanCard`, `SettingsView`, `NotificationsSection`, `ErrorBoundary`…
 - `public/sw.js` — service worker que muestra los push (mensajes solo de datos).
-- `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts` y `home.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
+- `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts`, `home.ts` y `pet.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
 - Funciones programadas: `sendReminders` (cada 5 min), `dailyDigest` (cada hora; manda el resumen a quien lo tenga a esa hora, `digestHour` en `config/notifications`), `homeReminders` (20:00: pagos de MEROE de mañana; el día 1, recordatorio de actualizar el ahorro), `updateEuribor` (8:30).
 - **Lista de la compra**: `shopping` (un doc por cosa) + `config/shopping.items` (lo que suelen comprar: veces y sección, para sugerencias). `ShoppingView`.
-- Agenda: franja `TodayStrip` ("Hoy para ti"). Formulario de planes: "Guardar cambios" solo aparece si hay cambios (`dirty`).
+- Agenda: franja `TodayStrip` ("Hoy para ti", con "💞 N días juntos" y días especiales). Formulario de planes: "Guardar cambios" solo aparece si hay cambios (`dirty`).
+- **Algún día** (en Planes, interruptor "Con fecha / Algún día"): colección `ideas` (`IdeasView`, `lib/ideas.ts`), ruleta "¿Qué hacemos hoy?"; "Ponerle fecha" abre el formulario relleno y al guardar marca la idea como hecha.
+- **Aniversario**: `config/couple.since` (Ajustes → Nosotros). `lib/couple.ts`; el resumen de la mañana del servidor añade la línea del día especial.
+- **Google Calendar**: función `calendarFeed` (HTTP pública, protegida por el token secreto de `config/calendar`; `?who=nita|kitos` filtra). Lógica pura en `functions/src/ics.ts`. Ajustes → Google Calendar crea/cambia el enlace. Solo las citas llevan RRULE (planes/tareas crean la siguiente al completarse).
+- **Modo oscuro** automático (sigue al móvil): en `index.css` se redefinen `cream`, `surface`, `ink`, `muted`, `stone-*` y los tonos pastel 50/100/700. **Usa `bg-surface` (no `bg-white`) para tarjetas, y `text-cream` (no `text-white`) sobre `bg-ink`.** `bg-white/10-30` solo sobre degradados.
 
 ## Casa (cooperativa MEROE)
 
 `src/components/home/` (portada `HomeView` → espacios Plan de pagos / Hipoteca / ¿Llegamos?, cada uno con entrada en el historial). Cálculos puros en `src/lib/home.ts` y `src/lib/mortgage.ts` (tests en `tests/`, con números inventados).
 - `home/meroe`: precio sin IVA, IVA, mes de entrega (`handover`), condiciones de hipoteca, ahorro mensual de cada uno.
 - `homeItems`: pagos/gastos/ingresos. Importe fijo o % del precio (`pctTotal` con IVA, `pctBase` sin IVA) → si sube el precio se recalcula. Cuotas mensuales: `monthly {count, day, start, paidOverride}`; se marcan pagadas solas al llegar su día (sin servidor), o con ajuste manual. `countsTowardPrice`: lo que queda del precio va a la entrega = hipoteca (% del precio sin IVA) + ahorros.
+- Presupuestos por categoría: `home/meroe.budgets` (barra roja si se pasan). Tickets: colección `receipts` (`{itemId, dataUrl}` JPEG comprimido < 900k caracteres en el propio Firestore, `lib/image.ts`); se borran con su gasto.
+- **La gata** (bloque "En casa" de la portada; accesible aunque MEROE no esté configurado): `pet/profile` (nombre, nacimiento, chip, veterinario, pesos) y `petCare` (cuidados cada N semanas/meses/años con `last` e `history`). `lib/pet.ts` (copia idéntica en `functions/src/pet.ts`). `homeReminders` avisa la víspera ("🐱 Mañana toca…") y cada 7 días si sigue pendiente; los cuidados sin "última vez" no avisan.
 - `homeFunds`: dinero de cada uno (lo actualizan a mano). `rates/euribor`: Euríbor 12M del BCE con historial (Cloud Functions `updateEuribor` diaria y `refreshEuribor` a petición).
 - **No subir los importes reales de la pareja al repo** (precio, ahorros, ayudas familiares): los meten ellos en la app.
 
@@ -49,7 +55,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - `assignee`: `nita` | `kitos` | `both`. "Duplicar" = dos documentos con el mismo `groupId`.
 - `repeat`: `{ days[] (0=domingo), yearly, rotate }`. Planes/tareas: al completar se crea el siguiente documento (`spawnedFrom`); con `rotate` (turnos) el siguiente es para la otra persona. Citas: no se completan; la función `sendReminders` las mueve a su siguiente fecha cuando pasan.
 - Citas de todo el día: avisos referidos a las 9:00. `remindWeekBefore`: aviso extra 7 días antes.
-- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`.
+- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple`, `config/calendar`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`.
 
 ## Cómo probar (en este entorno)
 
@@ -65,11 +71,12 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - En español `Intl.NumberFormat` no separa miles con 4 cifras ("1214 €"): usar `useGrouping: 'always'`.
 - No hacer `git add -f` de archivos `.env` (lo bloquea la política de permisos).
 - En la PWA de Android, un enlace https a Google Maps se abre en una pestaña de Chrome, no en la app: usar el enlace `intent://…;package=com.google.android.apps.maps` (`navigationHref` en `lib/maps.ts`, componente `DirectionsLink`).
+- En dev, `.env.production` no se carga: copia también `VITE_GOOGLE_MAPS_API_KEY` al `.env.local` de demo o las pruebas de Maps fallan.
+- Los textos con clase `uppercase` salen en mayúsculas en `innerText`: compáralos sin distinguir mayúsculas en los tests.
 - Las notificaciones push no se actualizan solas: nada de cuentas atrás en el texto ("Quedan 27 min" se queda viejo); poner la hora ("Hoy a las 19:00 (en 27 min)").
 
 ## Ideas pendientes
 
-Propuestas a Nita y aún sin hacer: ver las citas en Google Calendar (feed iCal), lista de "algún día" con "¿qué hacemos hoy?", espacio para la gata, modo oscuro, contador de aniversario.
+Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario.
 
-- Muebles: presupuesto por categoría con barra (ahora solo pagado/previsto) y fotos de tickets.
 - Confirmar con Nita: ¿la reserva (5.000 €) se descuenta del precio? ¿AJD de su comunidad? ("12 meses de obra" = un único pago; falta saber la fecha).

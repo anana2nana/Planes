@@ -80,6 +80,34 @@ service cloud.firestore {
         && request.resource.data.done is bool;
     }
 
+    // Fotos de tickets (JPEG comprimido en el propio documento, máx. ~1 MB).
+    match /receipts/{receiptId} {
+      allow read, delete: if isCouple();
+      allow create: if isCouple()
+        && request.resource.data.itemId is string
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 1000000;
+    }
+
+    // Ideas para "algún día".
+    match /ideas/{ideaId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120;
+    }
+
+    // La gata: ficha (pet/profile) y cuidados periódicos.
+    match /pet/{docId} {
+      allow read, write: if isCouple();
+    }
+    match /petCare/{careId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();

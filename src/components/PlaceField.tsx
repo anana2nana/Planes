@@ -70,7 +70,7 @@ export function PlaceField({ value, onChange }: { value: PlaceInfo | null; onCha
 
   if (value) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-surface">
         {value.lat !== null && value.lng !== null && !failed && <MiniMap lat={value.lat} lng={value.lng} />}
         <div className="flex items-start gap-3 p-3">
           <PinIcon className="mt-0.5 size-5 shrink-0 text-rose-500" />
@@ -94,7 +94,7 @@ export function PlaceField({ value, onChange }: { value: PlaceInfo | null; onCha
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-3 focus-within:border-both">
+      <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-surface px-3 focus-within:border-both">
         <PinIcon className="size-5 shrink-0 text-stone-400" />
         <input
           value={text}
@@ -114,7 +114,7 @@ export function PlaceField({ value, onChange }: { value: PlaceInfo | null; onCha
         {loading && <span className="size-4 animate-spin rounded-full border-2 border-stone-200 border-t-both" />}
       </div>
       {suggestions.length > 0 && (
-        <ul className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-stone-100 bg-white shadow-xl" role="listbox">
+        <ul className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-stone-100 bg-surface shadow-xl" role="listbox">
           {suggestions.map((s) => (
             <li key={s.id}>
               <button type="button" onClick={() => pick(s)} className="flex w-full items-start gap-3 px-3 py-2.5 text-left active:bg-stone-50" role="option">

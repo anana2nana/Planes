@@ -112,7 +112,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
     <div className="space-y-5">
       <TodayStrip plans={plans} me={me} onOpen={onOpen} onGoTasks={onGoTasks} />
 
-      <section className="rounded-3xl bg-white p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+      <section className="rounded-3xl bg-surface p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
         <div className="mb-3 flex items-center gap-2">
           <h2 className="flex-1 text-lg font-extrabold">{capitalize(monthFmt.format(month))}</h2>
           <button onClick={goToday} className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-bold active:scale-95">
@@ -154,7 +154,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
               >
                 <span
                   className={`tabular grid size-9 place-items-center rounded-full text-sm font-semibold transition ${
-                    isSel ? 'bg-ink text-white' : isToday ? 'text-both ring-2 ring-both' : inMonth ? 'text-ink' : 'text-stone-300'
+                    isSel ? 'bg-ink text-cream' : isToday ? 'text-both ring-2 ring-both' : inMonth ? 'text-ink' : 'text-stone-300'
                   }`}
                 >
                   {day.getDate()}
@@ -194,7 +194,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
               <button
                 key={`${e.plan.id}-${e.date.getTime()}`}
                 onClick={() => onOpen(e.plan)}
-                className="flex w-full items-center gap-3 rounded-3xl border-2 border-dashed border-violet-200 bg-white/60 p-3.5 text-left"
+                className="flex w-full items-center gap-3 rounded-3xl border-2 border-dashed border-violet-200 bg-surface/60 p-3.5 text-left"
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-violet-100 text-sm text-violet-600">
                   {e.plan.kind === 'event' ? eventEmoji(!!e.plan.repeat?.yearly) : <RepeatIcon className="size-3.5" />}
@@ -243,7 +243,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
         {upcoming.length === 0 ? (
           <p className="px-1 text-sm text-muted">Ninguna en los próximos 30 días. Médico, cumpleaños… añádelos con + → 📅 Cita.</p>
         ) : (
-          <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-white shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+          <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
             {upcoming.map((e) => (
               <div key={`${e.plan.id}-${e.date.getTime()}`} className="flex items-center">
                 <button

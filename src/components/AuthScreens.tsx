@@ -45,7 +45,7 @@ export function LoginScreen() {
       <button
         onClick={go}
         disabled={busy}
-        className="mt-10 flex h-14 w-full max-w-xs items-center justify-center gap-3 rounded-2xl bg-white font-bold shadow-lg shadow-stone-300/40 transition active:scale-[0.98] disabled:opacity-60"
+        className="mt-10 flex h-14 w-full max-w-xs items-center justify-center gap-3 rounded-2xl bg-surface font-bold shadow-lg shadow-stone-300/40 transition active:scale-[0.98] disabled:opacity-60"
       >
         <svg viewBox="0 0 48 48" className="size-5">
           <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
@@ -67,7 +67,7 @@ export function DeniedScreen({ user }: { user: User }) {
       <p className="mt-2 max-w-xs text-muted">
         <b className="text-ink">{user.email}</b> no tiene acceso. Entra con la cuenta de Nita o de Kitos.
       </p>
-      <button onClick={logout} className="mt-8 h-12 rounded-2xl bg-ink px-6 font-bold text-white active:scale-[0.98]">
+      <button onClick={logout} className="mt-8 h-12 rounded-2xl bg-ink px-6 font-bold text-cream active:scale-[0.98]">
         Usar otra cuenta
       </button>
     </Shell>
@@ -79,9 +79,9 @@ export function SetupScreen() {
     <Shell>
       <h1 className="text-2xl font-extrabold">Falta conectar Firebase</h1>
       <p className="mt-2 max-w-sm text-muted">
-        Copia <code className="rounded bg-white px-1.5 py-0.5 text-ink">.env.example</code> a{' '}
-        <code className="rounded bg-white px-1.5 py-0.5 text-ink">.env.local</code>, rellena las claves de tu proyecto de Firebase y reinicia{' '}
-        <code className="rounded bg-white px-1.5 py-0.5 text-ink">npm run dev</code>. Tienes los pasos en el README.
+        Copia <code className="rounded bg-surface px-1.5 py-0.5 text-ink">.env.example</code> a{' '}
+        <code className="rounded bg-surface px-1.5 py-0.5 text-ink">.env.local</code>, rellena las claves de tu proyecto de Firebase y reinicia{' '}
+        <code className="rounded bg-surface px-1.5 py-0.5 text-ink">npm run dev</code>. Tienes los pasos en el README.
       </p>
     </Shell>
   )

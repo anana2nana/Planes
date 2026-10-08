@@ -39,7 +39,7 @@ export function NextUp({ plan, onOpen }: { plan: Plan; onOpen: (p: Plan) => void
     {plan.place && (
       <DirectionsLink
         place={plan.place}
-        className="absolute right-4 top-12 flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-bold text-violet-700 shadow-lg active:scale-95"
+        className="absolute right-4 top-12 flex items-center gap-1.5 rounded-full bg-surface px-3.5 py-2 text-sm font-bold text-violet-700 shadow-lg active:scale-95"
       >
         <NavigateIcon className="size-4" /> Ir
       </DirectionsLink>
