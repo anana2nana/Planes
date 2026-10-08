@@ -9,7 +9,9 @@ import type { PersonId } from '../../lib/types'
 import { addShoppingItem } from '../../services/shopping'
 import { BottomSheet } from '../BottomSheet'
 import { ChevronIcon, PlusIcon, TrashIcon } from '../Icons'
-import { RecipeForm, emptyRecipe } from './RecipesView'
+import { RecipeCook } from './RecipeCook'
+import { RecipeEditor, emptyRecipe } from './RecipeEditor'
+import { toRecipeDraft } from './RecipesView'
 
 const dayFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric' })
 const shortFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
@@ -170,7 +172,8 @@ function MealSheet({
   const [d, setD] = useState(draft)
   const [repeat, setRepeat] = useState<string[]>([])
   const [newRecipe, setNewRecipe] = useState(false)
-  const [showRecipe, setShowRecipe] = useState(false)
+  const [cook, setCook] = useState(false)
+  const [editRecipe, setEditRecipe] = useState(false)
   const dirty = JSON.stringify(d) !== JSON.stringify(draft) || repeat.length > 0
   const recipe = d.recipeId ? recipes.find((r) => r.id === d.recipeId) : undefined
   const q = d.title.trim().toLowerCase()
@@ -191,7 +194,7 @@ function MealSheet({
 
   if (newRecipe)
     return (
-      <RecipeForm
+      <RecipeEditor
         draft={emptyRecipe({ title: d.title.trim() })}
         me={me}
         onClose={() => setNewRecipe(false)}
@@ -238,11 +241,9 @@ function MealSheet({
                   {sourceOf(recipe.url)?.emoji} Ver vídeo
                 </a>
               )}
-              {(recipe.ingredients.length > 0 || recipe.steps) && (
-                <button type="button" onClick={() => setShowRecipe((v) => !v)} className="rounded-full bg-stone-100 px-2.5 py-1 font-bold">
-                  {showRecipe ? 'Ocultar receta' : 'Ver ingredientes'}
-                </button>
-              )}
+              <button type="button" onClick={() => setCook(true)} className="rounded-full bg-stone-100 px-2.5 py-1 font-bold">
+                📖 Abrir receta
+              </button>
             </div>
           ) : (
             (matches.length > 0 || ideas.length > 0) && (
@@ -262,18 +263,6 @@ function MealSheet({
             <button type="button" onClick={() => setNewRecipe(true)} className="mt-2 text-xs font-bold text-both">
               + Guardar «{d.title.trim()}» en el recetario (con sus ingredientes)
             </button>
-          )}
-          {showRecipe && recipe && (
-            <div className="mt-3 rounded-2xl bg-stone-50 p-3 text-sm">
-              {recipe.ingredients.length > 0 && (
-                <ul className="list-inside list-disc space-y-0.5">
-                  {recipe.ingredients.map((i) => (
-                    <li key={i}>{i}</li>
-                  ))}
-                </ul>
-              )}
-              {recipe.steps && <p className="mt-2 whitespace-pre-wrap text-ink/80">{recipe.steps}</p>}
-            </div>
           )}
         </div>
 
@@ -345,6 +334,9 @@ function MealSheet({
             </div>
           </div>
         )}
+
+        {cook && recipe && <RecipeCook recipe={recipe} me={me} onClose={() => setCook(false)} onEdit={() => setEditRecipe(true)} onToast={onToast} />}
+        {editRecipe && recipe && <RecipeEditor draft={toRecipeDraft(recipe)} me={me} onClose={() => setEditRecipe(false)} onError={onToast} />}
 
         {existing && (
           <button

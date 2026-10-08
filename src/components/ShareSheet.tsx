@@ -10,7 +10,7 @@ import { saveIdea } from '../services/ideas'
 import { addShoppingItem } from '../services/shopping'
 import { BottomSheet } from './BottomSheet'
 import { GiftForm, emptyGift, hostOf } from './GiftsView'
-import { RecipeForm, emptyRecipe } from './food/RecipesView'
+import { RecipeEditor, emptyRecipe } from './food/RecipeEditor'
 
 const TARGETS: { id: ShareTarget; label: string }[] = [
   { id: 'idea', label: '💡 Algún día' },
@@ -68,7 +68,7 @@ export function ShareSheet({
 
   if (recipe)
     return (
-      <RecipeForm
+      <RecipeEditor
         draft={emptyRecipe({ title: /^https?:/.test(title) || /tiktok|youtube|instagram/i.test(title) ? '' : title, url: shared.link })}
         me={me}
         onClose={onClose}

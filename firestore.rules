@@ -146,6 +146,12 @@ service cloud.firestore {
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100;
     }
+    // HTML original de las recetas importadas (aparte, para que la lista pese poco).
+    match /recipeHtml/{recipeId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.html is string && request.resource.data.html.size() <= 700000;
+    }
     match /recipes/{recipeId} {
       allow read, delete: if isCouple();
       allow create, update: if isCouple()

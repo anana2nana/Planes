@@ -1,5 +1,6 @@
 // Menú de la semana y recetas: cálculos puros (testeados en tests/menu.test.ts).
 
+import { richFromSimple, shoppingNames, type RichRecipe } from './recipe.ts'
 import type { PersonId } from './types'
 
 export type MealSlot = 'comida' | 'cena'
@@ -18,15 +19,18 @@ export interface Meal {
   notes: string
 }
 
-export interface Recipe {
+export interface Recipe extends Omit<RichRecipe, 'title' | 'url' | 'servings' | 'notes'> {
   id: string
   title: string
   emoji: string
   url: string
+  /** Ingredientes como texto (derivados de los grupos en las recetas ricas). */
   ingredients: string[]
   steps: string
   servings: number | null
   notes: string
+  /** Tiene el HTML original guardado (en recipeHtml/{id}). */
+  hasHtml: boolean
   /** Última vez que se puso en el menú (yyyy-mm-dd). */
   lastPlanned: string | null
   createdAt: number
@@ -81,6 +85,7 @@ export function ingredientName(line: string): string {
     .trim()
   s = s.replace(LEAD, '')
   s = s
+    .split(/[,;]/)[0]
     .replace(/\b(al gusto|c\/n|cantidad necesaria|opcional|para (decorar|servir))\b.*$/i, '')
     .replace(/[,;:.]+$/, '')
     .trim()
@@ -88,7 +93,7 @@ export function ingredientName(line: string): string {
 }
 
 /** Lo que casi siempre hay en casa: sale desmarcado al pasar a la compra. */
-const PANTRY = ['sal', 'pimienta', 'aceite', 'aceite de oliva', 'aceite de oliva virgen extra', 'agua', 'azúcar', 'vinagre', 'pimentón', 'comino', 'orégano', 'laurel', 'perejil seco', 'harina', 'ajo en polvo']
+const PANTRY = ['sal', 'pimienta', 'aceite', 'aove', 'aceite de oliva', 'aceite de oliva virgen extra', 'agua', 'azúcar', 'vinagre', 'pimentón', 'comino', 'orégano', 'laurel', 'perejil seco', 'harina', 'ajo en polvo']
 export const isPantry = (name: string) => PANTRY.some((p) => name === p || name.startsWith(`${p} `)) || /^(sal|pimienta)\b/.test(name)
 
 export interface WeekIngredient {
@@ -99,7 +104,7 @@ export interface WeekIngredient {
 }
 
 /** Ingredientes de las recetas del menú, sin repetir, con los platos que los usan. */
-export function weekIngredients(meals: Pick<Meal, 'recipeId' | 'title'>[], recipes: Pick<Recipe, 'id' | 'title' | 'ingredients'>[]): WeekIngredient[] {
+export function weekIngredients(meals: Pick<Meal, 'recipeId' | 'title'>[], recipes: (Pick<Recipe, 'id' | 'title' | 'ingredients'> & { groups?: RichRecipe['groups'] })[]): WeekIngredient[] {
   const byId = new Map(recipes.map((r) => [r.id, r]))
   const out = new Map<string, WeekIngredient>()
   const seenRecipe = new Set<string>()
@@ -107,8 +112,8 @@ export function weekIngredients(meals: Pick<Meal, 'recipeId' | 'title'>[], recip
     const r = m.recipeId ? byId.get(m.recipeId) : undefined
     if (!r || seenRecipe.has(r.id)) continue // el mismo plato varios días (táper) cuenta una vez
     seenRecipe.add(r.id)
-    for (const line of r.ingredients) {
-      const name = ingredientName(line)
+    const names = r.groups?.length ? shoppingNames({ groups: r.groups }) : r.ingredients.map(ingredientName)
+    for (const name of names) {
       if (!name) continue
       const key = name.normalize('NFD').replace(/[̀-ͯ]/g, '')
       const cur = out.get(key) ?? { name, dishes: [], pantry: isPantry(name) }
@@ -167,4 +172,10 @@ export function sourceOf(url: string): { label: string; emoji: string } | null {
   } catch {
     return null
   }
+}
+
+/** La receta en formato rico (las sencillas se convierten al vuelo). */
+export function richOf(r: Recipe): RichRecipe {
+  if (r.groups.length || r.phases.length) return r
+  return { ...richFromSimple(r), description: r.description, tags: r.tags }
 }
