@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { saveBirthday, useCouple } from '../hooks/useCouple'
-import { deleteGift, saveGift, setGiftStatus, useGifts } from '../hooks/useGifts'
+import { deleteGift, saveGift, setGiftStatus, useGiftKey, useGifts } from '../hooks/useGifts'
+import { GiftLock } from './GiftLock'
 import { useSheetState } from '../hooks/useSheetState'
 import { OCCASIONS, OCCASION_ORDER, STATUS, upcomingOccasions, type Gift, type GiftOccasion, type GiftStatus } from '../lib/gifts'
 import { eur } from '../lib/home'
@@ -23,10 +24,12 @@ export type GiftDraft = Omit<Gift, 'id' | 'owner' | 'createdAt'> & { id?: string
 const toDraft = ({ id, title, occasion, url, price, notes, status }: Gift): GiftDraft => ({ id, title, occasion, url, price, notes, status })
 export const emptyGift = (o: Partial<GiftDraft> = {}): GiftDraft => ({ title: '', occasion: 'otra', url: '', price: null, notes: '', status: 'idea', ...o })
 
-/** Ideas de regalo para la pareja: solo las ve quien las apunta. */
+/** Ideas de regalo para la pareja: solo las ve quien las apunta, y van cifradas con su contraseña. */
 export function GiftsView({ me, onError }: { me: PersonId; onError: (m: string) => void }) {
   const partner: PersonId = me === 'nita' ? 'kitos' : 'nita'
-  const { gifts, loading } = useGifts(me)
+  const lock = useGiftKey(me)
+  const key = lock.state.status === 'ready' ? lock.state.key : null
+  const { gifts, loading } = useGifts(me, key)
   const { since, birthdays } = useCouple()
   const [sheet, openSheet, closeSheet] = useSheetState<GiftDraft>()
   const [showGiven, setShowGiven] = useState(false)
@@ -41,6 +44,8 @@ export function GiftsView({ me, onError }: { me: PersonId; onError: (m: string) 
     .map((o) => ({ o, items: pending.filter((g) => g.occasion === o) }))
     .filter((g) => g.items.length > 0)
 
+  if (!key) return <GiftLock lock={lock} partnerName={PEOPLE[partner].name} onError={onError} />
+
   return (
     <div className="space-y-5">
       <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-rose-400 via-pink-400 to-violet-400 p-5 text-white shadow-lg shadow-pink-300/40">
@@ -48,7 +53,7 @@ export function GiftsView({ me, onError }: { me: PersonId; onError: (m: string) 
           🎁
         </div>
         <p className="text-2xl font-extrabold">Para {PEOPLE[partner].name}</p>
-        <p className="mt-0.5 text-sm font-semibold opacity-95">🤫 Solo lo ves tú: {PEOPLE[partner].name} no puede ver esta lista.</p>
+        <p className="mt-0.5 text-sm font-semibold opacity-95">🔐 Cifrado con tu contraseña: solo lo ves tú.</p>
         <div className="no-scrollbar -mx-5 mt-3 flex gap-2 overflow-x-auto px-5">
           {upcoming.map((u) => {
             const n = pending.filter((g) => g.occasion === u.id).length
@@ -154,12 +159,21 @@ export function hostOf(url: string): string {
 export function GiftForm({ draft, me, partner, onClose, onError, onSaved }: { draft: GiftDraft; me: PersonId; partner: PersonId; onClose: () => void; onError: (m: string) => void; onSaved?: () => void }) {
   const [d, setD] = useState(draft)
   const [confirm, setConfirm] = useState(false)
+  const lock = useGiftKey(me)
   const isEdit = Boolean(draft.id)
   const dirty = JSON.stringify(d) !== JSON.stringify(draft)
   const canSave = d.title.trim() !== ''
+  // Sin la contraseña de regalos desbloqueada, primero se pide (p. ej. al compartir una tienda).
+  if (lock.state.status !== 'ready')
+    return (
+      <BottomSheet open onClose={onClose} title="🎁 Regalos">
+        <GiftLock lock={lock} partnerName={PEOPLE[partner].name} onError={onError} />
+      </BottomSheet>
+    )
+  const key = lock.state.key
   const save = () => {
     if (!canSave) return
-    saveGift({ ...d, title: d.title.trim(), url: d.url.trim(), notes: d.notes.trim() }, me).catch((e: Error) => onError(e.message))
+    saveGift({ ...d, title: d.title.trim(), url: d.url.trim(), notes: d.notes.trim() }, me, key).catch((e: Error) => onError(e.message))
     onSaved?.()
     onClose()
   }

@@ -14,7 +14,7 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Planes que se repiten** ciertos días de la semana (p. ej. martes y sábados, entre semana, todos los días). Al completar uno aparece el siguiente; si estaba vencido, salta al próximo día que toque sin acumular atrasos.
 - **Calendario** mensual: puntos de color por persona en cada día, repeticiones futuras en tono suave, y al tocar un día ves sus planes o añades uno nuevo con esa fecha.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
-- **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI).
+- **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI). Sin publicidad, analítica ni rastreadores; el tipo de letra va dentro de la app.
 - **🍝 Menú de la semana y recetas** (pestaña Comida): comidas de cada día y cenas del finde, quién lleva táper, quién cocina, recetario con el enlace al vídeo, ingredientes por grupos y pasos con señales y temporizadores (se pueden importar recetas en HTML y editarlas; modo cocina con raciones ajustables y pantalla siempre encendida), y un botón que pasa los ingredientes de la semana a la compra.
 - **🛒 Lista de la compra** compartida en tiempo real, por secciones, con "lo de siempre" (aprende lo que compráis).
 - **☀️ Resumen del día**: cada mañana, a la hora que elija cada uno, un aviso con lo de hoy; y la franja "Hoy para ti" en la Agenda.
@@ -31,7 +31,7 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **📆 Google Calendar**: enlace secreto (Ajustes) para ver las citas, planes y tareas en Google Calendar.
 - **💞 Contador** de días juntos y felicitación en el aniversario y cada 100 días.
 - **📤 Compartir con Nitakitos**: desde Google Maps, una tienda o cualquier app, *Compartir → Nitakitos* lo guarda como idea, plan, regalo, compra o nota.
-- **🎁 Regalos secretos**: ideas de regalo para tu pareja que solo ves tú (lo garantizan las reglas), con aviso 3 semanas y 1 semana antes de su cumple, el aniversario o Reyes.
+- **🎁 Regalos secretos**: ideas de regalo para tu pareja que solo ves tú (lo garantizan las reglas y van cifradas con tu contraseña), con aviso 3 semanas y 1 semana antes de su cumple, el aniversario o Reyes.
 - **📊 Reparto de tareas**: quién ha hecho cuántas este mes y los anteriores.
 - **📝 Notas de casa**: wifi, tallas, teléfonos útiles… con botón para copiar.
 - **🌙 Modo oscuro** automático, según el del móvil.
@@ -142,6 +142,7 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 | `recipes/{id}` | `title, emoji, url, description, tags[], servings, groups[{name, note, items[{q, name}]}], phases[{title, why, steps[{title, text, chips[], cue, fix, tech[], timer}]}], tips[], gear[], credit, notes, ingredients[] y steps (derivados), hasHtml, lastPlanned` |
 | `recipeHtml/{id}` | `html` (el original importado) |
 | `memories/{id}` · `memoryPhotos/{id}` | `title, date, md, kind, planId, place, text, thumb, photoCount, by` · `memoryId, data, order` |
-| `gifts/{id}` | `owner (solo lo lee su dueño), title, occasion, url, price, notes, status` |
+| `gifts/{id}` | `owner (solo lo lee su dueño), occasion, status, enc (título, enlace, precio y notas cifrados), title: '🔒'` |
+| `giftKeys/{persona}` | `salt, check, iterations` (para comprobar la contraseña de regalos; nunca la clave) |
 | `notes/{id}` | `emoji, title, body, pinned, updatedAt, updatedBy` |
 | `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |

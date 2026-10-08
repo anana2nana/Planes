@@ -6,7 +6,7 @@ App web móvil privada para una pareja: **Nita** (la dueña del repo, poco técn
 
 - **Producción**: Vercel publica automáticamente la rama por defecto de GitHub, que es **`claude/vigilant-volta-4eshsx`**. Si trabajas en otra rama, los cambios **no llegan** a la app hasta que se fusionen en esa. Avisa a Nita.
 - URL: https://planes-inky.vercel.app · Proyecto Firebase: `planes-5af6b` (plan Blaze, Firestore en `eur3`, funciones en `europe-west1`).
-- El repo es **privado** (a veces Nita lo pone público un momento para hacer `git pull` desde Cloud Shell).
+- El repo es **privado** (y no hace falta ponerlo público: ver la clave de Cloud Shell más abajo).
 - **Cloud Functions** (`functions/`) NO se despliegan solas. Nita lo hace desde Cloud Shell (https://shell.cloud.google.com/?project=planes-5af6b), donde ya tiene clonado el repo en `~/Planes`:
   ```
   cd Planes && git pull
@@ -14,6 +14,8 @@ App web móvil privada para una pareja: **Nita** (la dueña del repo, poco técn
   ```
   Si cambias `functions/` o `firestore.indexes.json`, díselo con estos comandos exactos.
 - ⚠️ **Nunca** despliegues `firestore:rules` desde el repo: `firestore.rules` tiene emails de ejemplo (`nita@gmail.com`…) y dejaría a la pareja sin acceso. Las reglas reales (con sus emails) se pegan a mano en la consola de Firebase. Si cambias las reglas, dale a Nita el texto completo con sus emails para pegarlo.
+- **Cloud Shell ya no necesita el repo público**: tiene una clave SSH de solo lectura (deploy key "Cloud Shell" en GitHub, `~/.ssh/planes`, host `github-planes` en `~/.ssh/config`). Si `git pull` falla por permisos, revisar eso antes de pedirle que lo haga público.
+- **Copia de seguridad**: programada en Firestore (`gcloud firestore backups schedules`, semanal los domingos, 14 semanas). Restaurar = `gcloud firestore databases restore` a una base nueva.
 - **No subas nunca sus emails reales al repo** (decisión de privacidad). Están solo en: reglas de la consola de Firebase, variables `VITE_NITA_EMAIL` / `VITE_KITOS_EMAIL` en Vercel y los parámetros `NITA_EMAIL` / `KITOS_EMAIL` de las funciones (`functions/.env.planes-5af6b`, solo en Cloud Shell).
 - `.env.production` (sí está en el repo) lleva la config web pública de Firebase y la clave VAPID pública.
 
@@ -40,8 +42,10 @@ Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (
 - **Google Calendar**: función `calendarFeed` (HTTP pública, protegida por el token secreto de `config/calendar`; `?who=nita|kitos` filtra). Lógica pura en `functions/src/ics.ts`. Ajustes → Google Calendar crea/cambia el enlace. Solo las citas llevan RRULE (planes/tareas crean la siguiente al completarse).
 - **Compartir con Nitakitos** (`share_target` en `public/manifest.webmanifest` → `/share?title&text&url`): `lib/share.ts` (`parseShared`, testeado) + `ShareSheet` (Algún día / Plan con fecha / Regalo / Compra / Nota). Si viene de Google Maps busca el sitio con `findPlace` (`lib/maps.ts`). Android solo actualiza el manifest de la app instalada cada cierto tiempo (o reinstalando).
 - **Regalos secretos** (Planes → 🎁 Regalos): colección `gifts` con `owner`; **las reglas solo dejan leer/escribir las tuyas** (función `me()` de las reglas, por email) y la consulta filtra `where('owner','==',me)`. Ocasiones en `lib/gifts.ts` (copia idéntica en `functions/src/gifts.ts`): cumple de la pareja (`config/couple.birthdays` "MM-DD", Ajustes → Nosotros), aniversario, Reyes, San Valentín. `homeReminders` avisa 21 y 7 días antes, solo a quien regala y sin títulos (pantalla bloqueada). Preferencia `gifts`.
+- **Regalos cifrados** (`lib/giftCrypto.ts` testeado, `hooks/useGifts.ts`, `GiftLock`): cada uno pone una contraseña (≥ 8 caracteres) → clave AES-GCM derivada con PBKDF2 (310k iteraciones, sal en `giftKeys/{persona}` junto a un `check` cifrado; nunca la clave). Título, enlace, precio y notas van en `enc`; en claro solo `owner`, `occasion`, `status` (los usa `homeReminders`) y `title: '🔒'`. La clave se guarda en el móvil (localStorage) tras escribirla una vez. Al crearla se cifran las ideas antiguas. Si se olvida: "empezar de cero" borra sus ideas. Ni la dueña del proyecto puede leerlas desde la consola.
 - **Reparto de tareas** (arriba en Tareas): `lib/split.ts` cuenta tareas hechas por mes según `doneBy`; `TaskSplit` (barra partida con los colores de cada uno; en oscuro `--color-kitos` es algo más oscuro, validado con el skill dataviz).
 - **Notas de casa** (Casa → En casa → Notas): colección `notes` (`useNotes`, `NotesView`), con plantillas (wifi, tallas, teléfonos) y botón Copiar.
+- Tipo de letra Plus Jakarta Sans **dentro de la app** (`@fontsource-variable/plus-jakarta-sans`), sin llamadas a Google Fonts. Sin analítica ni rastreadores: no añadir ninguno.
 - **Modo oscuro** automático (sigue al móvil): en `index.css` se redefinen `cream`, `surface`, `ink`, `muted`, `stone-*` y los tonos pastel 50/100/700. **Usa `bg-surface` (no `bg-white`) para tarjetas, y `text-cream` (no `text-white`) sobre `bg-ink`.** `bg-white/10-30` solo sobre degradados.
 
 ## Casa (cooperativa MEROE)
@@ -64,7 +68,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - `assignee`: `nita` | `kitos` | `both`. "Duplicar" = dos documentos con el mismo `groupId`.
 - `repeat`: `{ days[] (0=domingo), yearly, rotate }`. Planes/tareas: al completar se crea el siguiente documento (`spawnedFrom`); con `rotate` (turnos) el siguiente es para la otra persona. Citas: no se completan; la función `sendReminders` las mueve a su siguiente fecha cuando pasan.
 - Citas de todo el día: avisos referidos a las 9:00. `remindWeekBefore`: aviso extra 7 días antes.
-- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `meals`, `recipes`, `recipeHtml`, `memories`, `memoryPhotos`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona).
+- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `meals`, `recipes`, `recipeHtml`, `memories`, `memoryPhotos`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona y cifrada), `giftKeys`.
 
 ## Cómo probar (en este entorno)
 

@@ -175,6 +175,11 @@ service cloud.firestore {
         && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
     }
 
+    // Contraseña de regalos de cada uno: solo la sal y una comprobación (nunca la clave).
+    match /giftKeys/{person} {
+      allow read, write: if isCouple() && person == me();
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();
