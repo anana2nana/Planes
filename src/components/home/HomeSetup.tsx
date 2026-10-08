@@ -30,7 +30,7 @@ const base = (o: Partial<Draft>): Draft => ({
 
 /** Estructura de pagos de la cooperativa (la del Excel), sin importes personales: el precio lo pone ella. */
 const TEMPLATE: TemplateRow[] = [
-  { key: 'reserva', title: 'Reserva', enabled: true, hint: '5.000 € · pagado', build: () => base({ title: 'Reserva', amount: { type: 'fixed', value: 5000 }, paid: true, countsTowardPrice: false, notes: 'Revisa si la reserva se descuenta del precio del piso.' }) },
+  { key: 'reserva', title: 'Reserva', enabled: true, hint: '5.000 € · pagado (fondo: no se descuenta del precio)', build: () => base({ title: 'Reserva', amount: { type: 'fixed', value: 5000 }, paid: true, countsTowardPrice: false, notes: 'Es un fondo: no se descuenta del precio, pero si sube el precio se cubre primero con esto.' }) },
   { key: 'adhesion', title: 'Adhesión', enabled: true, hint: '12,5 % del precio con IVA · pagado', build: () => base({ title: 'Adhesión', amount: { type: 'pctTotal', value: 12.5 }, paid: true }) },
   { key: 'adicional', title: 'Aportación adicional (marzo)', enabled: true, hint: '2,5 % del precio con IVA · pagado', build: () => base({ title: 'Aportación adicional (marzo)', amount: { type: 'pctTotal', value: 2.5 }, paid: true }) },
   { key: 'obra', title: '12 meses de obra', enabled: true, hint: '1,25 % del precio con IVA · pendiente', build: () => base({ title: '12 meses de obra', amount: { type: 'pctTotal', value: 1.25 } }) },
@@ -41,9 +41,9 @@ const TEMPLATE: TemplateRow[] = [
   {
     key: 'ajd',
     title: 'AJD (impuesto de la escritura)',
-    enabled: false,
-    hint: '⚠️ No está en tu Excel. En vivienda nueva se paga en la escritura; el % depende de la comunidad autónoma (suele ir del 0,5 % al 1,5 % del precio sin IVA).',
-    build: (_c, d) => base({ title: 'AJD (impuesto de la escritura)', category: 'impuestos', amount: { type: 'pctBase', value: 1.5 }, countsTowardPrice: false, date: d, notes: 'Ajusta el % al de vuestra comunidad autónoma.' }),
+    enabled: true,
+    hint: '⚠️ No está en tu Excel. Se paga en la escritura: en la Comunidad de Madrid, 0,75 % del precio sin IVA (anunciado 0,4 % para menores de 40 desde 2027).',
+    build: (_c, d) => base({ title: 'AJD (impuesto de la escritura)', category: 'impuestos', amount: { type: 'pctBase', value: 0.75 }, countsTowardPrice: false, date: d, notes: 'Comunidad de Madrid: 0,75 %. Si se aprueba la rebaja para menores de 40 (desde 2027), bajaría al 0,4 %.' }),
   },
 ]
 
