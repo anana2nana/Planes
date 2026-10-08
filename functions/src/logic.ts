@@ -336,3 +336,17 @@ export function menuReminder(now: Date, plannedNextWeek: number, prefs: Record<P
       tag: 'menu-week',
     }))
 }
+
+// ─── Diario ─────────────────────────────────────────────────────────────────
+
+/** "📸 Tal día como hoy, hace un año: Ramen en Lavapiés" (el más reciente), o null. */
+export function onThisDayLine(memories: { title: string; date: string }[], now: Date): string | null {
+  const md = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const past = memories
+    .filter((m) => m.date.slice(5) === md && Number(m.date.slice(0, 4)) < now.getFullYear())
+    .sort((a, b) => b.date.localeCompare(a.date))
+  if (past.length === 0) return null
+  const years = now.getFullYear() - Number(past[0].date.slice(0, 4))
+  const more = past.length > 1 ? ` (y ${past.length - 1} más)` : ''
+  return `📸 Tal día como hoy, ${years === 1 ? 'hace un año' : `hace ${years} años`}: ${past[0].title}${more}`
+}

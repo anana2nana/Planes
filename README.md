@@ -24,6 +24,7 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
   - *Plan de pagos*: precio + IVA (si sube, todo se recalcula), hitos en % o en euros, cuotas mensuales que se marcan solas el día de cobro (con ajuste manual), gastos de compra, muebles y ventas de Wallapop, barras por categoría y vista "Total / Cada uno".
   - *Hipoteca*: simulador fija / variable / mixta con el Euríbor del BCE actualizado a diario, escenarios ±1 punto y gráfico del capital pendiente.
   - *¿Llegamos?*: dinero de cada uno, ahorro mensual y previsión hasta la entrega con semáforo.
+- **📸 Diario de recuerdos**: al completar un plan (o el día después de una cita) la app pregunta por fotos y una frase; álbum por meses y «tal día como hoy».
 - **💡 Algún día**: ideas sin fecha (restaurantes, escapadas, pelis) y la ruleta **¿Qué hacemos hoy?**, que elige una y la convierte en plan.
 - **🐱 La gata**: ficha (chip, veterinario con botón de llamar, peso con gráfico) y cuidados periódicos (vacuna, pipeta…) con aviso la víspera.
 - **🧾 Muebles**: presupuesto por categoría con barra y fotos de tickets y facturas en cada gasto.
@@ -140,6 +141,7 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 | `meals/{fecha_comida\|cena}` | `date, slot, title, recipeId, cook, eat {nita, kitos: casa\|taper\|fuera}, notes` |
 | `recipes/{id}` | `title, emoji, url, description, tags[], servings, groups[{name, note, items[{q, name}]}], phases[{title, why, steps[{title, text, chips[], cue, fix, tech[], timer}]}], tips[], gear[], credit, notes, ingredients[] y steps (derivados), hasHtml, lastPlanned` |
 | `recipeHtml/{id}` | `html` (el original importado) |
+| `memories/{id}` · `memoryPhotos/{id}` | `title, date, md, kind, planId, place, text, thumb, photoCount, by` · `memoryId, data, order` |
 | `gifts/{id}` | `owner (solo lo lee su dueño), title, occasion, url, price, notes, status` |
 | `notes/{id}` | `emoji, title, body, pinned, updatedAt, updatedBy` |
 | `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |

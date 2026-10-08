@@ -414,3 +414,12 @@ test('menú: línea del resumen y aviso del domingo', () => {
   assert.equal(menuReminder(sunday, 3, prefs).length, 0)
   assert.equal(menuReminder(new Date('2026-10-10T20:00:00'), 0, prefs).length, 0)
 })
+
+import { onThisDayLine } from './logic.js'
+
+test('diario: tal día como hoy en el resumen', () => {
+  const now = new Date('2026-10-08T08:00:00')
+  assert.equal(onThisDayLine([{ title: 'Ramen', date: '2025-10-08' }, { title: 'Playa', date: '2023-10-08' }, { title: 'Hoy', date: '2026-10-08' }], now), '📸 Tal día como hoy, hace un año: Ramen (y 1 más)')
+  assert.equal(onThisDayLine([{ title: 'Playa', date: '2023-10-08' }], now), '📸 Tal día como hoy, hace 3 años: Playa')
+  assert.equal(onThisDayLine([], now), null)
+})

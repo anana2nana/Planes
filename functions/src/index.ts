@@ -20,6 +20,7 @@ import {
   activityPushes,
   digestPush,
   mealLine,
+  onThisDayLine,
   menuReminder,
   type MealLite,
   normalizePrefs,
@@ -226,8 +227,10 @@ export const dailyDigest = onSchedule({ schedule: '0 * * * *', timeZone: 'Europe
   const special = typeof since === 'string' ? specialDay(since, now) : null
   const todayKey = ymdOf(now)
   const meals = (await db.collection('meals').where('date', '==', todayKey).get()).docs.map((d) => d.data() as MealLite)
+  const memories = (await db.collection('memories').where('md', '==', todayKey.slice(5)).get()).docs.map((d) => ({ title: String(d.get('title') ?? ''), date: String(d.get('date') ?? '') }))
+  const remember = onThisDayLine(memories, now)
   for (const person of people) {
-    const extra = [special, mealLine(meals, person)].filter(Boolean).join('\n') || null
+    const extra = [special, remember, mealLine(meals, person)].filter(Boolean).join('\n') || null
     const push = digestPush(person, plans, now.getTime(), extra)
     if (push) await send(push)
   }

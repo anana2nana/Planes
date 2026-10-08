@@ -20,6 +20,8 @@ interface Props {
   prefill?: Pick<PlanDraft, 'title' | 'place' | 'notes'>
   /** Se llama al guardar (crear o cambiar). */
   onSaved?: () => void
+  /** Abrir "Añadir recuerdo" para este plan. */
+  onMemory?: (plan: Plan) => void
   siblings: Plan[]
   me: PersonId
   tags: Tag[]
@@ -79,7 +81,7 @@ function quickDates() {
   ]
 }
 
-export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onSaved, siblings, me, tags, priorities, onClose, onError }: Props) {
+export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onSaved, onMemory, siblings, me, tags, priorities, onClose, onError }: Props) {
   const [initial] = useState<PlanDraft>(() => initialDraft(plan, defaultKind, defaultDate, prefill))
   const [draft, setDraft] = useState<PlanDraft>(initial)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -311,6 +313,11 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onS
           <TagPicker tags={tags} value={draft.tagIds} onChange={(ids) => set('tagIds', ids)} />
         </Field>
 
+        {isEdit && plan && onMemory && (
+          <button type="button" onClick={() => onMemory(plan)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-50 py-3 text-sm font-bold text-amber-700 active:scale-[0.99]">
+            📸 Añadir un recuerdo al diario
+          </button>
+        )}
         {isEdit && !confirmDelete && (
           <button
             type="button"

@@ -10,6 +10,9 @@ import { formatDue } from './lib/time'
 import type { Kind, Plan, PersonId, PlaceInfo } from './lib/types'
 import { parseShared, type Shared } from './lib/share'
 import { ShareSheet } from './components/ShareSheet'
+import { MemorySheet } from './components/memories/MemorySheet'
+import type { MemoryDraft } from './hooks/useMemories'
+import { ymd } from './lib/memories'
 import { KINDS } from './lib/kinds'
 import type { Idea } from './lib/ideas'
 import { setIdeaDone } from './services/ideas'
@@ -41,6 +44,15 @@ type Sheet = { mode: 'new'; kind?: Kind; date?: string; idea?: Idea; prefill?: P
 const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', shopping: 'task', home: 'plan', settings: 'plan' }
 const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', shopping: 'Comida', home: 'Casa', settings: 'Ajustes' }
 
+/** Borrador de recuerdo a partir de un plan, cita o tarea. */
+function memoryDraftOf(plan: Plan): MemoryDraft {
+  const due = plan.dueAt?.toDate()
+  const today = new Date()
+  // Si ya pasó, la fecha del plan; si no (se completa antes), hoy.
+  const date = due && due < today ? ymd(due) : ymd(today)
+  return { title: plan.title, date, kind: plan.kind, planId: plan.id, place: plan.place, text: '' }
+}
+
 function greeting() {
   const h = new Date().getHours()
   return h < 6 ? 'Buenas noches' : h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
@@ -59,6 +71,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     setTabState(t)
   }, [])
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [memory, setMemory] = useState<{ draft: MemoryDraft; prompt?: 'done' } | null>(null)
   const [shared, setShared] = useState<Shared | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -80,6 +93,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       navigator.vibrate?.(10)
       const { next, nextAssignee, committed } = toggleDone(plan, me, plans)
       committed.catch((e: Error) => setToast(e.message))
+      // Al completar un plan, siempre se pregunta por el recuerdo (foto + frase).
+      if (!plan.done && plan.kind === 'plan') setMemory({ draft: memoryDraftOf(plan), prompt: 'done' })
       if (next) {
         const when = formatDue(next, plan.allDay).toLowerCase()
         setToast(
@@ -197,6 +212,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onToggle={onToggle}
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
             onGoTasks={() => setTab('tasks')}
+            onToast={setToast}
             onGoMenu={() => {
               rememberFoodMode('menu')
               setTab('shopping')
@@ -234,6 +250,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
         </div>
       </nav>
 
+      {memory && <MemorySheet draft={memory.draft} me={me} prompt={memory.prompt} onClose={() => setMemory(null)} onError={setToast} />}
+
       {shared && (
         <ShareSheet
           shared={shared}
@@ -256,6 +274,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           defaultKind={sheet.mode === 'new' ? sheet.kind : undefined}
           defaultDate={sheet.mode === 'new' ? sheet.date : undefined}
           prefill={sheet.mode === 'new' ? (sheet.idea ? { title: sheet.idea.title, place: sheet.idea.place, notes: sheet.idea.notes } : sheet.prefill) : undefined}
+          onMemory={(p) => setMemory({ draft: memoryDraftOf(p) })}
           onSaved={() => {
             if (sheet.mode === 'new' && sheet.idea) setIdeaDone(sheet.idea.id, true).catch((e: Error) => setToast(e.message))
           }}

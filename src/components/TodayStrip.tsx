@@ -5,13 +5,18 @@ import { ChevronIcon } from './Icons'
 import { useCouple } from '../hooks/useCouple'
 import { daysTogether, specialDay } from '../lib/couple'
 import { useMeals } from '../hooks/useMenu'
+import { dismissPrompt, readDismissed, useMemories, type MemoryDraft } from '../hooks/useMemories'
+import { eventPrompts, onThisDay, yearsAgo, type Memory } from '../lib/memories'
+import { MemorySheet } from './memories/MemorySheet'
+import { MemoryView, toMemoryDraft } from './memories/DiaryView'
+import { useState } from 'react'
 import { ymd } from '../lib/menu'
 
 const EMOJI = { plan: '💞', task: '🧹' }
 const timeFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' })
 
 /** "Hoy para ti": lo de hoy de la persona (suyo o de los dos) y lo que arrastra atrasado. */
-export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu }: { plans: Plan[]; me: PersonId; onOpen: (p: Plan) => void; onGoTasks: () => void; onGoMenu?: () => void }) {
+export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu, onToast = console.error }: { plans: Plan[]; me: PersonId; onOpen: (p: Plan) => void; onGoTasks: () => void; onGoMenu?: () => void; onToast?: (m: string) => void }) {
   const now = new Date(useNow(60_000))
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
@@ -23,6 +28,17 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu }: { plans: 
   const special = since ? specialDay(since, now) : null
   const todayKey = ymd(now)
   const { meals } = useMeals(todayKey, todayKey)
+  const { memories } = useMemories()
+  const [dismissed, setDismissed] = useState(readDismissed)
+  const prompts = eventPrompts(
+    plans.filter((p) => p.kind === 'event' && (p.assignee === me || p.assignee === 'both')).map((p) => ({ id: p.id, kind: p.kind, title: p.title, dueMs: p.dueAt?.toMillis() ?? null, repeat: p.repeat })),
+    memories,
+    dismissed,
+    now,
+  )
+  const otd = onThisDay(memories, now)
+  const [sheet, setSheet] = useState<{ draft: MemoryDraft; key?: string; thumb?: string | null } | null>(null)
+  const [viewing, setViewing] = useState<Memory | null>(null)
   const myMeals = meals.filter((m) => m.eat[me] !== 'fuera').sort((a, b) => Number(a.slot === 'cena') - Number(b.slot === 'cena'))
 
   return (
@@ -67,6 +83,59 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu }: { plans: 
           </span>
           <ChevronIcon className="size-3.5 shrink-0 text-muted" />
         </button>
+      )}
+      {otd.length > 0 && (
+        <button onClick={() => setViewing(otd[0].memory)} className="mt-2 flex w-full items-center gap-3 rounded-xl bg-surface/70 p-2 text-left active:scale-[0.99]">
+          {otd[0].memory.thumb ? (
+            <img src={otd[0].memory.thumb} alt="" className="size-11 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-amber-100 text-xl">✨</span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-amber-700">Tal día como hoy, {yearsAgo(otd[0].years)}</span>
+            <span className="block truncate text-sm font-semibold">{otd[0].memory.title}</span>
+          </span>
+          <ChevronIcon className="size-3.5 shrink-0 text-muted" />
+        </button>
+      )}
+      {prompts.slice(0, 2).map((p) => (
+        <button
+          key={p.key}
+          onClick={() => {
+            const ev = plans.find((x) => x.id === p.id)
+            setSheet({ key: p.key, draft: { title: p.title, date: p.date, kind: 'event', planId: p.id, place: ev?.place ?? null, text: '' } })
+          }}
+          className="mt-2 flex w-full items-center gap-2.5 rounded-xl bg-surface/70 px-3 py-2 text-left text-sm active:scale-[0.99]"
+        >
+          <span aria-hidden>📸</span>
+          <span className="min-w-0 flex-1 truncate">
+            ¿Qué tal fue <b className="font-semibold">{p.title}</b>?
+          </span>
+          <ChevronIcon className="size-3.5 shrink-0 text-muted" />
+        </button>
+      ))}
+      {sheet && (
+        <MemorySheet
+          draft={sheet.draft}
+          thumb={sheet.thumb}
+          me={me}
+          prompt={sheet.key ? 'event' : undefined}
+          onSkip={() => {
+            if (!sheet.key) return
+            dismissPrompt(sheet.key)
+            setDismissed(readDismissed())
+          }}
+          onClose={() => setSheet(null)}
+          onError={onToast}
+        />
+      )}
+      {viewing && (
+        <MemoryView
+          memory={memories.find((m) => m.id === viewing.id) ?? viewing}
+          onClose={() => setViewing(null)}
+          onEdit={() => setSheet({ draft: toMemoryDraft(viewing), thumb: viewing.thumb })}
+          onError={onToast}
+        />
       )}
       {overdue > 0 && (
         <button onClick={onGoTasks} className="mt-2 flex w-full items-center gap-1.5 rounded-xl bg-surface/70 px-3 py-2 text-left text-xs font-bold text-rose-700 active:scale-[0.99]">
