@@ -3,6 +3,7 @@
 
 import { eur, installmentDate, paidInstallments, unitAmount, type Fund, type HomeConfig, type HomeItem } from './home.js'
 import { daysUntil, nextDue, type CareItem } from './pet.js'
+import { GIFT_LEADS, upcomingOccasions, type GiftOccasion, type GiftStatus } from './gifts.js'
 import { NAME, type NotifPrefs, type Person, type Push } from './logic.js'
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -89,4 +90,52 @@ export function petPushes(care: CareItem[], petName: string, prefs: Record<Perso
   const body = due.map((c) => `${c.title}${late.includes(c) ? ' (pendiente)' : ''}`).join('\n')
   const people: Person[] = ['nita', 'kitos']
   return people.filter((p) => prefs[p].home).map((p) => ({ to: p, kind: 'reminder' as const, title, body: `${body}\nMárcalo en Casa → ${name} cuando esté hecho.`, tag: 'pet-care' }))
+}
+
+/** Lo mínimo de cada idea de regalo para avisar (sin títulos: el aviso puede verse en la pantalla bloqueada). */
+export interface GiftLite {
+  owner: Person
+  occasion: GiftOccasion
+  status: GiftStatus
+}
+
+const GIFT_TITLE: Record<Exclude<GiftOccasion, 'otra'>, (partner: Person) => string> = {
+  cumple: (p) => `es el cumple de ${NAME[p]}`,
+  aniversario: () => 'es vuestro aniversario',
+  reyes: () => 'son los Reyes',
+  sanvalentin: () => 'es San Valentín',
+}
+
+/** Unas semanas antes de cada ocasión, a cada uno: cuántas ideas tiene para su pareja. */
+export function giftPushes(
+  gifts: GiftLite[],
+  birthdays: Record<Person, string | null>,
+  since: string | null,
+  prefs: Record<Person, NotifPrefs>,
+  now: Date,
+): Push[] {
+  const pushes: Push[] = []
+  for (const me of ['nita', 'kitos'] as Person[]) {
+    if (!prefs[me].gifts) continue
+    const partner: Person = me === 'nita' ? 'kitos' : 'nita'
+    for (const o of upcomingOccasions(birthdays[partner], since, now)) {
+      if (!GIFT_LEADS.includes(o.days)) continue
+      const mine = gifts.filter((g) => g.owner === me && g.occasion === o.id && g.status !== 'regalado')
+      // San Valentín no lo celebra todo el mundo: solo si ya hay alguna idea apuntada.
+      if (o.id === 'sanvalentin' && mine.length === 0) continue
+      const bought = mine.filter((g) => g.status === 'comprado').length
+      const when = o.days === 7 ? 'En una semana' : `En ${o.days} días`
+      pushes.push({
+        to: me,
+        kind: 'reminder',
+        title: `🎁 ${when} ${GIFT_TITLE[o.id](partner)}`,
+        body:
+          mine.length === 0
+            ? 'Aún no tienes ninguna idea apuntada. Apúntalas en Planes → Regalos 🤫'
+            : `Tienes ${mine.length} ${mine.length === 1 ? 'idea apuntada' : 'ideas apuntadas'}${bought ? ` (${bought} ya ${bought === 1 ? 'comprada' : 'compradas'})` : ''} 🤫`,
+        tag: `gift-${o.id}`,
+      })
+    }
+  }
+  return pushes
 }

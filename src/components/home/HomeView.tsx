@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useHome } from '../../hooks/useHome'
+import { useNotes } from '../../hooks/useNotes'
 import { usePet } from '../../hooks/usePet'
 import { useSheetState } from '../../hooks/useSheetState'
 import { daysUntil, nextDue } from '../../lib/pet'
@@ -14,13 +15,16 @@ import { HomeSetup } from './HomeSetup'
 import { ItemForm } from './ItemForm'
 import { MortgageView } from './MortgageView'
 import { PaymentsView } from './PaymentsView'
+import { NotesView } from './NotesView'
 import { PetView } from './PetView'
 import { SavingsView } from './SavingsView'
 import { Label, NumberField, Segmented } from './ui'
 
-type Section = 'pagos' | 'hipoteca' | 'llegamos' | 'gata'
+type Section = 'pagos' | 'hipoteca' | 'llegamos' | 'gata' | 'notas'
 
-const SECTION_TITLE: Record<Section, string> = { pagos: 'Plan de pagos', hipoteca: 'Hipoteca', llegamos: '¿Llegamos?', gata: 'La gata' }
+const SECTION_TITLE: Record<Section, string> = { pagos: 'Plan de pagos', hipoteca: 'Hipoteca', llegamos: '¿Llegamos?', gata: 'La gata', notas: 'Notas de casa' }
+/** Espacios del bloque "En casa" (no son de MEROE). */
+export const AT_HOME_TITLES = [SECTION_TITLE.gata, SECTION_TITLE.notas]
 
 const PER_PERSON_KEY = 'nitakitos.home.perPerson'
 const readPerPerson = () => {
@@ -64,10 +68,11 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
 
   if (loading) return <div className="h-40 animate-pulse rounded-3xl bg-surface/70" />
   if (section === 'gata') return <PetView onError={onError} />
+  if (section === 'notas') return <NotesView me={me} onError={onError} onToast={onError} />
   if (!config)
     return (
       <div className="space-y-4">
-        <AtHome onOpen={() => open('gata')} />
+        <AtHome onOpen={open} />
         <HomeSetup onError={onError} />
       </div>
     )
@@ -199,7 +204,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
         </Tile>
       </div>
 
-      <AtHome onOpen={() => open('gata')} />
+      <AtHome onOpen={open} />
 
       <p className="px-2 text-center text-[11px] text-muted">
         Precio con IVA {money(totalPrice(config))} · todo se comparte en tiempo real entre los dos
@@ -210,8 +215,9 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
 }
 
 /** Bloque "En casa": la gata (y en el futuro, más cosas del día a día). */
-function AtHome({ onOpen }: { onOpen: () => void }) {
+function AtHome({ onOpen }: { onOpen: (s: Section) => void }) {
   const { profile, care } = usePet()
+  const { notes } = useNotes()
   const today = new Date()
   // Los que aún no tienen "última vez" no cuentan como atrasados (no sabemos cuándo tocan).
   const due = care.filter((c) => c.last).map((c) => ({ c, days: daysUntil(nextDue(c, today), today) })).sort((a, b) => a.days - b.days)
@@ -221,7 +227,7 @@ function AtHome({ onOpen }: { onOpen: () => void }) {
     <section>
       <h2 className="mb-2 mt-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">En casa</h2>
       <div className="grid grid-cols-2 gap-3">
-        <Tile emoji="🐱" title={profile?.name || 'La gata'} muted={!profile && care.length === 0} onClick={onOpen}>
+        <Tile emoji="🐱" title={profile?.name || 'La gata'} muted={!profile && care.length === 0} onClick={() => onOpen('gata')}>
           {late > 0 ? (
             <b className="text-rose-600">{late === 1 ? `Toca: ${first.c.title}` : `${late} cuidados pendientes`}</b>
           ) : first ? (
@@ -233,6 +239,16 @@ function AtHome({ onOpen }: { onOpen: () => void }) {
             'Apunta cuándo fue la última vez de cada cuidado'
           ) : (
             'Vacunas, desparasitar, peso, veterinario…'
+          )}
+        </Tile>
+        <Tile emoji="📝" title="Notas" muted={notes.length === 0} onClick={() => onOpen('notas')}>
+          {notes.length === 0 ? (
+            'Wifi, tallas, teléfonos… lo que siempre buscáis'
+          ) : (
+            <>
+              <b className="text-ink">{notes.length}</b> {notes.length === 1 ? 'nota' : 'notas'}
+              <span className="block truncate">{notes.slice(0, 3).map((n) => n.title).join(' · ')}</span>
+            </>
           )}
         </Tile>
       </div>

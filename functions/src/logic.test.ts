@@ -219,7 +219,7 @@ test('resumen de la mañana: lo de hoy de cada uno, en orden, con atrasadas', ()
 })
 
 test('preferencias nuevas con valores por defecto', () => {
-  assert.deepEqual(normalizePrefs({ leads: [15] }), { activity: true, reminders: true, leads: [15], digest: true, digestHour: 8, home: true })
+  assert.deepEqual(normalizePrefs({ leads: [15] }), { activity: true, reminders: true, leads: [15], digest: true, digestHour: 8, home: true, gifts: true })
   assert.equal(normalizePrefs({ digestHour: 30 }).digestHour, 8)
 })
 
@@ -350,4 +350,49 @@ test('iCal: escapado y líneas cortadas a 75 bytes sin romper tildes ni emojis',
   const folded = fold(long)
   for (const l of folded.split('\r\n')) assert.ok(Buffer.byteLength(l) <= 75)
   assert.equal(folded.split('\r\n').map((l, i) => (i ? l.slice(1) : l)).join(''), long)
+})
+
+import { giftPushes } from './homeAlerts.js'
+import { nextYearly, upcomingOccasions } from './gifts.js'
+
+test('src/gifts.ts es idéntico al de la app', () => {
+  const here = fileURLToPath(new URL('../src/gifts.ts', import.meta.url))
+  const app = fileURLToPath(new URL('../../src/lib/gifts.ts', import.meta.url))
+  assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
+})
+
+test('regalos: próximas fechas (cumple, aniversario, Reyes, San Valentín)', () => {
+  const today = new Date('2026-10-08T20:00:00')
+  assert.deepEqual(nextYearly('10-08', today), { date: '2026-10-08', days: 0 })
+  assert.deepEqual(nextYearly('01-06', today), { date: '2027-01-06', days: 90 })
+  assert.equal(nextYearly('02-29', new Date('2027-01-01T10:00:00')).date, '2027-02-28')
+  const up = upcomingOccasions('10-29', '2020-11-15', today)
+  assert.deepEqual(up.map((o) => [o.id, o.days]), [['cumple', 21], ['aniversario', 38], ['reyes', 90], ['sanvalentin', 129]])
+  assert.deepEqual(upcomingOccasions(null, null, today).map((o) => o.id), ['reyes', 'sanvalentin'])
+})
+
+test('regalos: aviso 3 semanas antes solo a quien regala, sin desvelar las ideas', () => {
+  const prefs = { nita: { ...DEFAULT_PREFS }, kitos: { ...DEFAULT_PREFS } }
+  const today = new Date('2026-10-08T20:00:00')
+  const gifts = [
+    { owner: 'nita' as const, occasion: 'cumple' as const, status: 'idea' as const },
+    { owner: 'nita' as const, occasion: 'cumple' as const, status: 'comprado' as const },
+    { owner: 'nita' as const, occasion: 'cumple' as const, status: 'regalado' as const },
+    { owner: 'kitos' as const, occasion: 'cumple' as const, status: 'idea' as const },
+  ]
+  // Cumple de Kitos el 29-10 (21 días); el de Nita no toca.
+  const p = giftPushes(gifts, { nita: '03-01', kitos: '10-29' }, null, prefs, today)
+  assert.equal(p.length, 1)
+  assert.equal(p[0].to, 'nita')
+  assert.equal(p[0].title, '🎁 En 21 días es el cumple de Kitos')
+  assert.equal(p[0].body, 'Tienes 2 ideas apuntadas (1 ya comprada) 🤫')
+  // Una semana antes del aniversario: a los dos, aunque no tengan ideas.
+  const a = giftPushes([], { nita: null, kitos: null }, '2019-10-15', prefs, today)
+  assert.deepEqual(a.map((x) => x.to), ['nita', 'kitos'])
+  assert.equal(a[0].title, '🎁 En una semana es vuestro aniversario')
+  assert.match(a[0].body, /Aún no tienes ninguna idea/)
+  // Quien lo desactiva no lo recibe; San Valentín sin ideas no avisa.
+  assert.equal(giftPushes([], { nita: null, kitos: null }, '2019-10-15', { ...prefs, kitos: { ...DEFAULT_PREFS, gifts: false } }, today).length, 1)
+  assert.equal(giftPushes([], { nita: null, kitos: null }, null, prefs, new Date('2027-01-24T20:00:00')).length, 0)
+  assert.equal(giftPushes([{ owner: 'kitos', occasion: 'sanvalentin', status: 'idea' }], { nita: null, kitos: null }, null, prefs, new Date('2027-01-24T20:00:00'))[0].to, 'kitos')
 })

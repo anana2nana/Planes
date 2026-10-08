@@ -97,4 +97,6 @@ export interface NotifPrefs {
   digestHour: number
   /** Avisos de la casa: pago de mañana, actualizar el ahorro. */
   home: boolean
+  /** Avisos de regalos (unas semanas antes de cada fecha). */
+  gifts: boolean
 }

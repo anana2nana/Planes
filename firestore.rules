@@ -14,6 +14,11 @@ service cloud.firestore {
         ];
     }
 
+    // Quién es quien (para lo privado de cada uno, como los regalos).
+    function me() {
+      return request.auth.token.email.lower() == 'nita@gmail.com' ? 'nita' : 'kitos';
+    }
+
     function isValidPlan(p) {
       return p.title is string
         && p.title.size() > 0 && p.title.size() <= 200
@@ -106,6 +111,29 @@ service cloud.firestore {
       allow create, update: if isCouple()
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+    }
+
+    // Notas de casa (wifi, tallas, teléfonos…).
+    match /notes/{noteId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 60
+        && request.resource.data.body is string && request.resource.data.body.size() <= 5000;
+    }
+
+    // 🤫 Ideas de regalo: cada uno solo ve y toca las suyas (ni siquiera la pareja puede leerlas).
+    match /gifts/{giftId} {
+      allow read, delete: if isCouple() && resource.data.owner == me();
+      allow create: if isCouple()
+        && request.resource.data.owner == me()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120;
+      allow update: if isCouple()
+        && resource.data.owner == me()
+        && request.resource.data.owner == me()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120;
     }
 
     // Euríbor: lo escribe solo el servidor (Cloud Functions).

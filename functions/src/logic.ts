@@ -50,9 +50,11 @@ export interface NotifPrefs {
   digestHour: number
   /** Avisos de la casa (cuota de mañana, actualizar el ahorro). */
   home: boolean
+  /** Avisos de regalos: unas semanas antes del cumple de la pareja, aniversario, Reyes… */
+  gifts: boolean
 }
 
-export const DEFAULT_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440], digest: true, digestHour: 8, home: true }
+export const DEFAULT_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440], digest: true, digestHour: 8, home: true, gifts: true }
 
 export interface Push {
   to: Person
@@ -75,6 +77,7 @@ export function normalizePrefs(raw: Partial<NotifPrefs> | undefined): NotifPrefs
     digest: raw?.digest ?? DEFAULT_PREFS.digest,
     digestHour: typeof raw?.digestHour === 'number' && raw.digestHour >= 0 && raw.digestHour <= 23 ? raw.digestHour : DEFAULT_PREFS.digestHour,
     home: raw?.home ?? DEFAULT_PREFS.home,
+    gifts: raw?.gifts ?? DEFAULT_PREFS.gifts,
   }
 }
 

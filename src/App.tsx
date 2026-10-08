@@ -7,7 +7,9 @@ import { PEOPLE } from './lib/people'
 import { refreshPush } from './lib/push'
 import { toggleDone } from './services/plans'
 import { formatDue } from './lib/time'
-import type { Kind, Plan, PersonId } from './lib/types'
+import type { Kind, Plan, PersonId, PlaceInfo } from './lib/types'
+import { parseShared, type Shared } from './lib/share'
+import { ShareSheet } from './components/ShareSheet'
 import { KINDS } from './lib/kinds'
 import type { Idea } from './lib/ideas'
 import { setIdeaDone } from './services/ideas'
@@ -16,7 +18,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
 import { CalendarIcon, CartIcon, CheckIcon, ChevronIcon, CloudOffIcon, HomeIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
 import { CalendarView } from './components/CalendarView'
-import { HomeView } from './components/home/HomeView'
+import { AT_HOME_TITLES, HomeView } from './components/home/HomeView'
 import { ShoppingView } from './components/ShoppingView'
 import { PlanForm } from './components/PlanForm'
 import { PlansView } from './components/PlansView'
@@ -32,7 +34,8 @@ export default function App() {
 }
 
 type Tab = 'agenda' | 'plans' | 'tasks' | 'shopping' | 'home' | 'settings'
-type Sheet = { mode: 'new'; kind?: Kind; date?: string; idea?: Idea } | { mode: 'edit'; id: string } | null
+type Prefill = { title: string; place: PlaceInfo | null; notes: string }
+type Sheet = { mode: 'new'; kind?: Kind; date?: string; idea?: Idea; prefill?: Prefill } | { mode: 'edit'; id: string } | null
 
 /** Tipo por defecto al pulsar + en cada pestaña. */
 const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', shopping: 'task', home: 'plan', settings: 'plan' }
@@ -56,6 +59,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     setTabState(t)
   }, [])
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [shared, setShared] = useState<Shared | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -95,12 +99,27 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   }, [])
   const closeSheet = useCallback(() => {
     if (history.state?.sheet) history.back() // el popstate de abajo la cierra
-    else setSheet(null)
+    else {
+      setSheet(null)
+      setShared(null)
+    }
+  }, [])
+
+  // "Compartir → Nitakitos" desde otra app (share_target del manifest): llega a /share?title&text&url.
+  useEffect(() => {
+    if (location.pathname !== '/share') return
+    const q = new URLSearchParams(location.search)
+    history.replaceState(null, '', '/')
+    history.pushState({ sheet: true }, '')
+    setShared(parseShared({ title: q.get('title'), text: q.get('text'), url: q.get('url') }))
   }, [])
 
   useEffect(() => {
     const onPop = () => {
-      if (!history.state?.sheet) setSheet(null)
+      if (!history.state?.sheet) {
+        setSheet(null)
+        setShared(null)
+      }
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
@@ -145,7 +164,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           )}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">
-              {tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : tab === 'home' && homeTitle ? (homeTitle === 'La gata' ? 'Casa' : 'Casa · MEROE') : 'Vuestro espacio'}
+              {tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : tab === 'home' && homeTitle ? (AT_HOME_TITLES.includes(homeTitle) ? 'Casa' : 'Casa · MEROE') : 'Vuestro espacio'}
             </p>
             <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{tab === 'home' && homeTitle ? homeTitle : TAB_TITLE[tab]}</h1>
           </div>
@@ -211,13 +230,28 @@ function Home({ user, me }: { user: User; me: PersonId }) {
         </div>
       </nav>
 
+      {shared && (
+        <ShareSheet
+          shared={shared}
+          me={me}
+          onClose={closeSheet}
+          onToast={setToast}
+          onMakePlan={(prefill) => {
+            // Reutiliza la misma entrada del historial: el "atrás" cierra el formulario.
+            setShared(null)
+            setTab('plans')
+            openSheet({ mode: 'new', kind: 'plan', prefill })
+          }}
+        />
+      )}
+
       {sheet && (sheet.mode === 'new' || editing) && (
         <PlanForm
           key={sheet.mode === 'edit' ? sheet.id : `new-${sheet.kind ?? ''}-${sheet.date ?? ''}-${sheet.idea?.id ?? ''}`}
           plan={editing}
           defaultKind={sheet.mode === 'new' ? sheet.kind : undefined}
           defaultDate={sheet.mode === 'new' ? sheet.date : undefined}
-          prefill={sheet.mode === 'new' && sheet.idea ? { title: sheet.idea.title, place: sheet.idea.place, notes: sheet.idea.notes } : undefined}
+          prefill={sheet.mode === 'new' ? (sheet.idea ? { title: sheet.idea.title, place: sheet.idea.place, notes: sheet.idea.notes } : sheet.prefill) : undefined}
           onSaved={() => {
             if (sheet.mode === 'new' && sheet.idea) setIdeaDone(sheet.idea.id, true).catch((e: Error) => setToast(e.message))
           }}

@@ -50,6 +50,8 @@
     --color-ink: #f3eef6;
     --color-muted: #a69cb0;
 
+    /* Un poco más oscuro que en claro para el gráfico de reparto (validado contra el fondo). */
+    --color-kitos: #0b9ad9;
     --color-nita-soft: #4a1d2a;
     --color-kitos-soft: #0f3346;
     --color-both-soft: #2f2350;

@@ -92,3 +92,11 @@ export function navigationHref(place: PlaceInfo): string {
   const path = web.replace(/^https:\/\//, '')
   return `intent://${path}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(web)};end`
 }
+
+/** Busca un sitio por texto (p. ej. lo compartido desde Google Maps) y devuelve el primero, o null. */
+export async function findPlace(query: string): Promise<PlaceInfo | null> {
+  if (!isMapsConfigured || !query.trim()) return null
+  const { AutocompleteSessionToken } = await loadPlaces()
+  const [first] = await searchPlaces(query, new AutocompleteSessionToken())
+  return first ? resolvePlace(first) : null
+}

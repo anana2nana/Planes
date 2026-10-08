@@ -26,13 +26,17 @@ Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (
 - `src/services/plans.ts` — todas las escrituras. No se espera a `commit()` en la UI (funciona offline).
 - `src/components/` — `CalendarView` (Agenda), `PlansView` (listas de planes/tareas), `PlanForm`, `PlanCard`, `SettingsView`, `NotificationsSection`, `ErrorBoundary`…
 - `public/sw.js` — service worker que muestra los push (mensajes solo de datos).
-- `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts`, `home.ts` y `pet.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
+- `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts`, `home.ts`, `pet.ts` y `gifts.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
 - Funciones programadas: `sendReminders` (cada 5 min), `dailyDigest` (cada hora; manda el resumen a quien lo tenga a esa hora, `digestHour` en `config/notifications`), `homeReminders` (20:00: pagos de MEROE de mañana; el día 1, recordatorio de actualizar el ahorro), `updateEuribor` (8:30).
 - **Lista de la compra**: `shopping` (un doc por cosa) + `config/shopping.items` (lo que suelen comprar: veces y sección, para sugerencias). `ShoppingView`.
 - Agenda: franja `TodayStrip` ("Hoy para ti", con "💞 N días juntos" y días especiales). Formulario de planes: "Guardar cambios" solo aparece si hay cambios (`dirty`).
 - **Algún día** (en Planes, interruptor "Con fecha / Algún día"): colección `ideas` (`IdeasView`, `lib/ideas.ts`), ruleta "¿Qué hacemos hoy?"; "Ponerle fecha" abre el formulario relleno y al guardar marca la idea como hecha.
 - **Aniversario**: `config/couple.since` (Ajustes → Nosotros). `lib/couple.ts`; el resumen de la mañana del servidor añade la línea del día especial.
 - **Google Calendar**: función `calendarFeed` (HTTP pública, protegida por el token secreto de `config/calendar`; `?who=nita|kitos` filtra). Lógica pura en `functions/src/ics.ts`. Ajustes → Google Calendar crea/cambia el enlace. Solo las citas llevan RRULE (planes/tareas crean la siguiente al completarse).
+- **Compartir con Nitakitos** (`share_target` en `public/manifest.webmanifest` → `/share?title&text&url`): `lib/share.ts` (`parseShared`, testeado) + `ShareSheet` (Algún día / Plan con fecha / Regalo / Compra / Nota). Si viene de Google Maps busca el sitio con `findPlace` (`lib/maps.ts`). Android solo actualiza el manifest de la app instalada cada cierto tiempo (o reinstalando).
+- **Regalos secretos** (Planes → 🎁 Regalos): colección `gifts` con `owner`; **las reglas solo dejan leer/escribir las tuyas** (función `me()` de las reglas, por email) y la consulta filtra `where('owner','==',me)`. Ocasiones en `lib/gifts.ts` (copia idéntica en `functions/src/gifts.ts`): cumple de la pareja (`config/couple.birthdays` "MM-DD", Ajustes → Nosotros), aniversario, Reyes, San Valentín. `homeReminders` avisa 21 y 7 días antes, solo a quien regala y sin títulos (pantalla bloqueada). Preferencia `gifts`.
+- **Reparto de tareas** (arriba en Tareas): `lib/split.ts` cuenta tareas hechas por mes según `doneBy`; `TaskSplit` (barra partida con los colores de cada uno; en oscuro `--color-kitos` es algo más oscuro, validado con el skill dataviz).
+- **Notas de casa** (Casa → En casa → Notas): colección `notes` (`useNotes`, `NotesView`), con plantillas (wifi, tallas, teléfonos) y botón Copiar.
 - **Modo oscuro** automático (sigue al móvil): en `index.css` se redefinen `cream`, `surface`, `ink`, `muted`, `stone-*` y los tonos pastel 50/100/700. **Usa `bg-surface` (no `bg-white`) para tarjetas, y `text-cream` (no `text-white`) sobre `bg-ink`.** `bg-white/10-30` solo sobre degradados.
 
 ## Casa (cooperativa MEROE)
@@ -55,7 +59,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - `assignee`: `nita` | `kitos` | `both`. "Duplicar" = dos documentos con el mismo `groupId`.
 - `repeat`: `{ days[] (0=domingo), yearly, rotate }`. Planes/tareas: al completar se crea el siguiente documento (`spawnedFrom`); con `rotate` (turnos) el siguiente es para la otra persona. Citas: no se completan; la función `sendReminders` las mueve a su siguiente fecha cuando pasan.
 - Citas de todo el día: avisos referidos a las 9:00. `remindWeekBefore`: aviso extra 7 días antes.
-- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple`, `config/calendar`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`.
+- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona).
 
 ## Cómo probar (en este entorno)
 
@@ -77,7 +81,10 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 
 ## Ideas pendientes
 
-Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario.
+Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario, compartir, regalos, reparto, notas.
+
+- **Fase 2 (acordada con Nita)**: menú semanal sobre todo de **comidas** (cenan poco) con recetas → ingredientes a la compra; **diario de planes** (foto + frase al completar, "tal día como hoy"); **viajes** (fechas, reservas, maleta reutilizable, presupuesto). Descartado: gastos compartidos tipo Splitwise (no hacen cuentas).
+- Navegación: 5 pestañas abajo, no caben más. Si algo necesita pestaña propia, replantear (p. ej. "Más" o juntar Planes y Tareas). Nita prefiere completar funciones y reordenar después.
 
 - MEROE está en la **Comunidad de Madrid**: AJD 0,75 % del precio sin IVA (anunciada rebaja al 0,4 % para menores de 40 desde 2027, pendiente de aprobar; no sabemos sus edades).
 - La **reserva (5.000 €) no se descuenta del precio**: es un fondo; si sube el precio, la subida se cubre primero con él. En la app: `countsTowardPrice: false`.

@@ -28,6 +28,10 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **🧾 Muebles**: presupuesto por categoría con barra y fotos de tickets y facturas en cada gasto.
 - **📆 Google Calendar**: enlace secreto (Ajustes) para ver las citas, planes y tareas en Google Calendar.
 - **💞 Contador** de días juntos y felicitación en el aniversario y cada 100 días.
+- **📤 Compartir con Nitakitos**: desde Google Maps, una tienda o cualquier app, *Compartir → Nitakitos* lo guarda como idea, plan, regalo, compra o nota.
+- **🎁 Regalos secretos**: ideas de regalo para tu pareja que solo ves tú (lo garantizan las reglas), con aviso 3 semanas y 1 semana antes de su cumple, el aniversario o Reyes.
+- **📊 Reparto de tareas**: quién ha hecho cuántas este mes y los anteriores.
+- **📝 Notas de casa**: wifi, tallas, teléfonos útiles… con botón para copiar.
 - **🌙 Modo oscuro** automático, según el del móvil.
 - **Notificaciones push** (también con la app cerrada):
   - cuando el otro te asigna un plan, crea uno para los dos o completa algo;
@@ -131,5 +135,7 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 | `ideas/{id}` | `title, category, place, notes, done, addedBy` |
 | `receipts/{id}` | `itemId, data (JPEG comprimido, data URL), addedBy` |
 | `pet/profile` · `petCare/{id}` | ficha de la gata · `title, every {n, unit}, last, history[]` |
-| `config/couple` · `config/calendar` | `since` · `token` (enlace secreto del calendario) |
+| `config/couple` · `config/calendar` | `since, birthdays {nita, kitos: "MM-DD"}` · `token` (enlace secreto del calendario) |
+| `gifts/{id}` | `owner (solo lo lee su dueño), title, occasion, url, price, notes, status` |
+| `notes/{id}` | `emoji, title, body, pinned, updatedAt, updatedBy` |
 | `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |

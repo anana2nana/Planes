@@ -131,6 +131,7 @@ export function NotificationsSection({ me, onError }: { me: PersonId; onError: (
             </div>
           )}
           <Toggle label="🏗️ Avisos de la casa (pago de mañana, ahorro)" checked={prefs.home} onChange={(v) => update({ home: v })} />
+          <Toggle label="🎁 Regalos (3 y 1 semana antes de cada fecha)" checked={prefs.gifts} onChange={(v) => update({ gifts: v })} />
           <div className="px-4 py-3">
             <button onClick={test} disabled={busy} className="text-sm font-bold text-both disabled:opacity-50">
               {testSent ? '¡Enviada! Debería llegarte en unos segundos' : 'Enviarme una notificación de prueba'}

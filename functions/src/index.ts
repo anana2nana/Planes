@@ -11,7 +11,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
 import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
-import { homePushes, petPushes } from './homeAlerts.js'
+import { giftPushes, homePushes, petPushes, type GiftLite } from './homeAlerts.js'
 import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
 import type { CareItem } from './pet.js'
 import type { Amount, CategoryId, Fund, HomeConfig, HomeItem, MonthlySchedule } from './home.js'
@@ -263,7 +263,7 @@ function parseHomeItem(id: string, x: Record<string, any>): HomeItem {
   }
 }
 
-/** Cada tarde a las 20:00: pagos de mañana y, el día 1, recordatorio de actualizar el ahorro. */
+/** Cada tarde a las 20:00: cuidados de la gata, regalos, pagos de mañana y (el día 1) actualizar el ahorro. */
 export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Europe/Madrid' }, async () => {
   const [cfgSnap, petSnap, careSnap, prefs] = await Promise.all([db.doc('home/meroe').get(), db.doc('pet/profile').get(), db.collection('petCare').get(), loadPrefs()])
   const care: CareItem[] = careSnap.docs.map((d) => ({
@@ -274,6 +274,15 @@ export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Eur
     history: [],
   }))
   for (const push of petPushes(care, String(petSnap.get('name') ?? ''), prefs, new Date())) await send(push)
+
+  const [coupleSnap, giftsSnap] = await Promise.all([db.doc('config/couple').get(), db.collection('gifts').get()])
+  const md = (v: unknown) => (typeof v === 'string' && /^\d{2}-\d{2}$/.test(v) ? v : null)
+  const since = coupleSnap.get('since')
+  const gifts: GiftLite[] = giftsSnap.docs
+    .map((d) => ({ owner: d.get('owner'), occasion: d.get('occasion') ?? 'otra', status: d.get('status') ?? 'idea' }))
+    .filter((g): g is GiftLite => g.owner === 'nita' || g.owner === 'kitos')
+  const birthdays = { nita: md(coupleSnap.get('birthdays')?.nita), kitos: md(coupleSnap.get('birthdays')?.kitos) }
+  for (const push of giftPushes(gifts, birthdays, typeof since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(since) ? since : null, prefs, new Date())) await send(push)
 
   const cfg = parseHome(cfgSnap.data())
   if (!cfg) return

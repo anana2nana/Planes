@@ -7,9 +7,11 @@ import type { Assignee, Plan, PersonId, PriorityConfig, Tag } from '../lib/types
 import { Avatar } from './Avatar'
 import { NextUp } from './NextUp'
 import { IdeasView } from './IdeasView'
+import { GiftsView } from './GiftsView'
 import { useIdeas } from '../hooks/useIdeas'
 import type { Idea } from '../lib/ideas'
 import { PlanCard } from './PlanCard'
+import { TaskSplit } from './TaskSplit'
 
 type Who = 'all' | Assignee
 type Status = 'pending' | 'done'
@@ -42,7 +44,7 @@ const EMPTY = {
 }
 
 export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading, onOpen, onToggle, onMakePlan, onError }: Props) {
-  const [someday, setSomeday] = useState(false)
+  const [mode, setMode] = useState<'dated' | 'someday' | 'gifts'>('dated')
   const ideas = useIdeas()
   const pendingIdeas = ideas.filter((i) => !i.done).length
   const [who, setWho] = useState<Who>('all')
@@ -129,21 +131,27 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
   return (
     <div className="space-y-5">
       {kind === 'plan' && (
-        <div className="grid grid-cols-2 rounded-2xl bg-stone-200/60 p-1 text-sm font-bold" role="tablist" aria-label="Planes o ideas">
-          {[
-            { v: false, label: '📅 Con fecha' },
-            { v: true, label: `💡 Algún día${pendingIdeas ? ` · ${pendingIdeas}` : ''}` },
-          ].map((o) => (
-            <button key={String(o.v)} role="tab" aria-selected={someday === o.v} onClick={() => setSomeday(o.v)} className={`rounded-xl py-2 transition ${someday === o.v ? 'bg-surface shadow-sm' : 'text-muted'}`}>
+        <div className="grid grid-cols-3 rounded-2xl bg-stone-200/60 p-1 text-[13px] font-bold" role="tablist" aria-label="Planes, ideas o regalos">
+          {(
+            [
+              { v: 'dated', label: '📅 Con fecha' },
+              { v: 'someday', label: `💡 Algún día${pendingIdeas ? ` · ${pendingIdeas}` : ''}` },
+              { v: 'gifts', label: '🎁 Regalos' },
+            ] as const
+          ).map((o) => (
+            <button key={o.v} role="tab" aria-selected={mode === o.v} onClick={() => setMode(o.v)} className={`truncate rounded-xl px-1 py-2 transition ${mode === o.v ? 'bg-surface shadow-sm' : 'text-muted'}`}>
               {o.label}
             </button>
           ))}
         </div>
       )}
-      {kind === 'plan' && someday ? (
+      {kind === 'plan' && mode === 'someday' ? (
         <IdeasView me={me} onMakePlan={(i) => onMakePlan?.(i)} onError={(m) => onError?.(m)} />
+      ) : kind === 'plan' && mode === 'gifts' ? (
+        <GiftsView me={me} onError={(m) => onError?.(m)} />
       ) : (
       <>
+      {kind === 'task' && <TaskSplit plans={allPlans} />}
       {/* Filtro por persona */}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {(['all', 'nita', 'kitos', 'both'] as Who[]).map((w) => {

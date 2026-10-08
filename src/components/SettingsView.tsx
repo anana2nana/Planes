@@ -11,7 +11,8 @@ import { LogoutIcon, PlusIcon, TrashIcon } from './Icons'
 import { NotificationsSection } from './NotificationsSection'
 import { ErrorBoundary } from './ErrorBoundary'
 import { CalendarSection } from './CalendarSection'
-import { saveCoupleSince, useCouple } from '../hooks/useCouple'
+import { saveBirthday, saveCoupleSince, useCouple } from '../hooks/useCouple'
+import { BirthdayInput } from './BirthdayInput'
 import { daysTogether } from '../lib/couple'
 
 interface Props {
@@ -37,6 +38,8 @@ export function SettingsView({ user, me, tags, plans, priorities, onError }: Pro
 
       <Section title="Nosotros">
         <CoupleRow onError={onError} />
+        <BirthdayRow person="nita" onError={onError} />
+        <BirthdayRow person="kitos" onError={onError} />
       </Section>
 
       <Section title="Google Calendar" hint="Ver la agenda allí">
@@ -261,5 +264,19 @@ function CoupleRow({ onError }: { onError: (msg: string) => void }) {
         className="h-10 shrink-0 rounded-xl border border-stone-200 bg-surface px-2 text-sm font-semibold outline-none focus:border-both"
       />
     </label>
+  )
+}
+
+function BirthdayRow({ person, onError }: { person: PersonId; onError: (msg: string) => void }) {
+  const { birthdays } = useCouple()
+  return (
+    <div className="flex items-center gap-3 border-t border-stone-100 px-4 py-3">
+      <Avatar mode={person} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Cumple de {PEOPLE[person].name}</span>
+        <span className="text-xs text-muted">Para avisar de los regalos</span>
+      </span>
+      <BirthdayInput value={birthdays[person]} onChange={(v) => saveBirthday(person, v).catch((e: Error) => onError(e.message))} label={`Cumple de ${PEOPLE[person].name}`} />
+    </div>
   )
 }
