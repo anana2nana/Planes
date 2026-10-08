@@ -168,3 +168,22 @@ test('src/recurrence.ts es idéntico al de la app', () => {
   const app = fileURLToPath(new URL('../../src/lib/recurrence.ts', import.meta.url))
   assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
 })
+
+// ─── Euríbor ────────────────────────────────────────────────────────────────
+
+import { parseEcbCsv } from './euribor.js'
+
+test('lee el CSV del BCE (con títulos entre comillas que llevan comas)', () => {
+  const csv = [
+    'KEY,FREQ,REF_AREA,CURRENCY,PROVIDER_FM,INSTRUMENT_FM,PROVIDER_FM_ID,DATA_TYPE_FM,TIME_PERIOD,OBS_VALUE,OBS_STATUS,TITLE',
+    'FM.M.U2.EUR.RT.MM.EURIBOR1YD_.HSTA,M,U2,EUR,RT,MM,EURIBOR1YD_,HSTA,2026-08,2.153,A,"Euribor 1-year - Historical close, average of observations through period"',
+    'FM.M.U2.EUR.RT.MM.EURIBOR1YD_.HSTA,M,U2,EUR,RT,MM,EURIBOR1YD_,HSTA,2026-07,2.081,A,"Euribor 1-year - Historical close, average of observations through period"',
+    'FM.M.U2.EUR.RT.MM.EURIBOR1YD_.HSTA,M,U2,EUR,RT,MM,EURIBOR1YD_,HSTA,2026-09,,A,"sin dato"',
+    '',
+  ].join('\r\n')
+  assert.deepEqual(parseEcbCsv(csv), [
+    { month: '2026-07', value: 2.081 },
+    { month: '2026-08', value: 2.153 },
+  ])
+  assert.throws(() => parseEcbCsv('A,B\n1,2'), /Formato del BCE inesperado/)
+})

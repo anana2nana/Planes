@@ -10,6 +10,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
+import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
 import {
   LATE_GRACE_MIN,
   activityPushes,
@@ -143,17 +144,18 @@ export const sendReminders = onSchedule({ schedule: 'every 5 minutes', timeZone:
 
 // ─── Notificación de prueba (botón en Ajustes) ─────────────────────────────
 
+/** Persona a partir del usuario que llama (o null si no es ninguno de los dos). */
+function personOf(auth: { token: { email?: string; email_verified?: boolean } } | undefined): Person | null {
+  const email = (auth?.token.email ?? '').toLowerCase()
+  if (!email || auth?.token.email_verified !== true) return null
+  if (email === NITA_EMAIL.value().toLowerCase()) return 'nita'
+  if (email === KITOS_EMAIL.value().toLowerCase()) return 'kitos'
+  return null
+}
+
 export const sendTestNotification = onCall(async (req) => {
-  const email = (req.auth?.token.email ?? '').toLowerCase()
-  const person: Person | null =
-    email && email === NITA_EMAIL.value().toLowerCase()
-      ? 'nita'
-      : email && email === KITOS_EMAIL.value().toLowerCase()
-        ? 'kitos'
-        : null
-  if (!person || req.auth?.token.email_verified !== true) {
-    throw new HttpsError('permission-denied', 'Este espacio es privado.')
-  }
+  const person = personOf(req.auth)
+  if (!person) throw new HttpsError('permission-denied', 'Este espacio es privado.')
   await send({
     to: person,
     kind: 'reminder',
@@ -162,4 +164,38 @@ export const sendTestNotification = onCall(async (req) => {
     tag: 'test',
   })
   return { ok: true }
+})
+
+// ─── Euríbor (para el simulador de hipoteca) ───────────────────────────────
+
+async function storeEuribor() {
+  const res = await fetch(ECB_EURIBOR_URL, { headers: { Accept: 'text/csv' } })
+  if (!res.ok) throw new Error(`BCE respondió ${res.status}`)
+  const history = parseEcbCsv(await res.text())
+  const last = history[history.length - 1]
+  if (!last) throw new Error('El BCE no devolvió datos')
+  await db.doc('rates/euribor').set({
+    value: last.value,
+    month: last.month,
+    history,
+    source: 'BCE · Euribor 1-year (media mensual)',
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+  logger.info(`Euríbor ${last.month}: ${last.value} %`)
+  return last
+}
+
+/** Cada mañana (el BCE publica la media de cada mes a primeros del siguiente). */
+export const updateEuribor = onSchedule({ schedule: 'every day 08:30', timeZone: 'Europe/Madrid' }, async () => {
+  await storeEuribor()
+})
+
+/** Botón "Actualizar" del simulador. */
+export const refreshEuribor = onCall(async (req) => {
+  if (!personOf(req.auth)) throw new HttpsError('permission-denied', 'Este espacio es privado.')
+  try {
+    return await storeEuribor()
+  } catch (e) {
+    throw new HttpsError('unavailable', (e as Error).message)
+  }
 })

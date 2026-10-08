@@ -50,5 +50,30 @@ service cloud.firestore {
     match /config/{docId} {
       allow read, write: if isCouple();
     }
+
+    // Casa (cooperativa MEROE): configuración, plan de pagos y ahorros.
+    match /home/{docId} {
+      allow read, write: if isCouple();
+    }
+
+    match /homeItems/{itemId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
+        && request.resource.data.amount.value is number;
+    }
+
+    match /homeFunds/{fundId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.amount is number
+        && request.resource.data.owner in ['nita', 'kitos', 'both'];
+    }
+
+    // Euríbor: lo escribe solo el servidor (Cloud Functions).
+    match /rates/{docId} {
+      allow read: if isCouple();
+    }
   }
 }

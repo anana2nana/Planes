@@ -21,12 +21,24 @@ App web móvil privada para una pareja: **Nita** (la dueña del repo, poco técn
 
 Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (Auth con Google, Firestore en tiempo real con caché persistente, Cloud Messaging) · Cloud Functions v2 (Node 22).
 
-- `src/App.tsx` — pestañas **Agenda / Planes / Tareas / Ajustes**, botón + (crea el tipo de la pestaña), hoja de edición (ocupa una entrada del historial para que el "atrás" de Android la cierre).
+- `src/App.tsx` — pestañas **Agenda / Planes / Tareas / Casa** (Ajustes: tocando el avatar de arriba), botón + (crea el tipo de la pestaña), hoja de edición (ocupa una entrada del historial para que el "atrás" de Android la cierre).
 - `src/lib/` — `types.ts`, `kinds.ts` (textos por tipo), `recurrence.ts` (repeticiones), `time.ts`, `people.ts`, `push.ts` (FCM), `firebase.ts`.
 - `src/services/plans.ts` — todas las escrituras. No se espera a `commit()` en la UI (funciona offline).
 - `src/components/` — `CalendarView` (Agenda), `PlansView` (listas de planes/tareas), `PlanForm`, `PlanCard`, `SettingsView`, `NotificationsSection`, `ErrorBoundary`…
 - `public/sw.js` — service worker que muestra los push (mensajes solo de datos).
 - `functions/src/` — `index.ts` (triggers), `logic.ts` (qué avisar, puro y testeado), `recurrence.ts` (**copia idéntica** de `src/lib/recurrence.ts`; un test lo comprueba).
+
+## Casa (cooperativa MEROE)
+
+`src/components/home/` (portada `HomeView` → espacios Plan de pagos / Hipoteca / ¿Llegamos?, cada uno con entrada en el historial). Cálculos puros en `src/lib/home.ts` y `src/lib/mortgage.ts` (tests en `tests/`, con números inventados).
+- `home/meroe`: precio sin IVA, IVA, mes de entrega (`handover`), condiciones de hipoteca, ahorro mensual de cada uno.
+- `homeItems`: pagos/gastos/ingresos. Importe fijo o % del precio (`pctTotal` con IVA, `pctBase` sin IVA) → si sube el precio se recalcula. Cuotas mensuales: `monthly {count, day, start, paidOverride}`; se marcan pagadas solas al llegar su día (sin servidor), o con ajuste manual. `countsTowardPrice`: lo que queda del precio va a la entrega = hipoteca (% del precio sin IVA) + ahorros.
+- `homeFunds`: dinero de cada uno (lo actualizan a mano). `rates/euribor`: Euríbor 12M del BCE con historial (Cloud Functions `updateEuribor` diaria y `refreshEuribor` a petición).
+- **No subir los importes reales de la pareja al repo** (precio, ahorros, ayudas familiares): los meten ellos en la app.
+
+## Google Maps
+
+`src/lib/maps.ts` + `PlaceField`: Places API (New) para sugerencias, mini mapa (Maps JS + `DEMO_MAP_ID`) y enlace de ruta `google.com/maps/dir`. Clave `VITE_GOOGLE_MAPS_API_KEY` en `.env.production` (pública; restringida a planes-inky.vercel.app y localhost:5173). Desde este entorno Google Maps SÍ responde (se puede probar de verdad en localhost:5173).
 
 ## Modelo de datos (colección `plans`)
 
@@ -38,7 +50,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 
 ## Cómo probar (en este entorno)
 
-- `npm run build` (incluye `tsc`) · `npm --prefix functions test` (tests de lógica, con `TZ=Europe/Madrid`).
+- `npm run build` (incluye `tsc`) · `npm test` (cálculos de la app en `tests/` + tests de las funciones, con `TZ=Europe/Madrid`).
 - E2E: emuladores de Auth+Firestore (`firebase-tools emulators:start --only auth,firestore --project demo-nitakitos`) + `vite` con un `.env.local` de demo y `VITE_USE_EMULATORS=true`. El popup de Google no carga aquí: iniciar sesión con `signInWithCredential(GoogleAuthProvider.credential(JSON.stringify({sub,email,email_verified:true})))` importando los módulos desde el dev server. Usa perfiles de Playwright de Pixel con `timezoneId: 'Europe/Madrid'` y ejecuta node con `TZ=Europe/Madrid`.
 - El emulador de Functions no arranca aquí (el CLI usa el proxy para 127.0.0.1): ejecutar los handlers compilados con `.run(event)` contra el emulador de Firestore.
 - Borra `.env.local` y para los procesos al terminar.
@@ -46,10 +58,12 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 ## Errores ya encontrados (no repetir)
 
 - En Chrome reciente `window.scrollTo()` devuelve una promesa: nunca `useEffect(() => window.scrollTo(...))` sin llaves (React la toma como limpieza → "l is not a function").
-- `pkill -f vite` mata también tu propia shell: busca PIDs con `ps` + `awk`.
+- `pkill -f vite` mata también tu propia shell: busca PIDs con `ps` + `awk`, y nunca en el mismo comando que arranca esos procesos (el texto del comando también coincide).
+- En español `Intl.NumberFormat` no separa miles con 4 cifras ("1214 €"): usar `useGrouping: 'always'`.
 - No hacer `git add -f` de archivos `.env` (lo bloquea la política de permisos).
 
 ## Ideas pendientes
 
-- Integración con Google Maps (destinos y "cómo llegar").
-- Módulo de gastos de la casa nueva por categorías.
+- Muebles: presupuesto por categoría con barra (ahora solo pagado/previsto) y fotos de tickets.
+- Aviso push el día antes de cada cuota de la cooperativa.
+- Confirmar con Nita: ¿la reserva (5.000 €) se descuenta del precio? ¿Cómo se pagan los "12 meses de obra"? ¿AJD de su comunidad?

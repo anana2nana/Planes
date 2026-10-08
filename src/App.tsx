@@ -12,8 +12,9 @@ import { KINDS } from './lib/kinds'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
-import { CalendarIcon, CheckIcon, CloudOffIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
+import { CalendarIcon, CheckIcon, ChevronIcon, CloudOffIcon, HomeIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
 import { CalendarView } from './components/CalendarView'
+import { HomeView } from './components/home/HomeView'
 import { PlanForm } from './components/PlanForm'
 import { PlansView } from './components/PlansView'
 import { SettingsView } from './components/SettingsView'
@@ -27,12 +28,12 @@ export default function App() {
   return <Home user={auth.user} me={auth.me} />
 }
 
-type Tab = 'agenda' | 'plans' | 'tasks' | 'settings'
+type Tab = 'agenda' | 'plans' | 'tasks' | 'home' | 'settings'
 type Sheet = { mode: 'new'; kind?: Kind; date?: string } | { mode: 'edit'; id: string } | null
 
 /** Tipo por defecto al pulsar + en cada pestaña. */
-const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', settings: 'plan' }
-const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', settings: 'Ajustes' }
+const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', home: 'plan', settings: 'plan' }
+const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', home: 'Casa', settings: 'Ajustes' }
 
 function greeting() {
   const h = new Date().getHours()
@@ -43,7 +44,14 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   const { plans, sync } = usePlans()
   const tags = useTags()
   const priorities = usePriorities()
-  const [tab, setTab] = useState<Tab>('agenda')
+  const [tab, setTabState] = useState<Tab>('agenda')
+  /** Título del espacio abierto dentro de Casa (Plan de pagos, Hipoteca…), o null en la portada. */
+  const [homeTitle, setHomeTitle] = useState<string | null>(null)
+  const setTab = useCallback((t: Tab) => {
+    // Al salir de un espacio de Casa por la barra inferior, no dejarlo "abierto" en el historial.
+    if (history.state?.casa) history.replaceState(null, '')
+    setTabState(t)
+  }, [])
   const [sheet, setSheet] = useState<Sheet>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -116,10 +124,27 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     <div className="mx-auto min-h-dvh max-w-lg">
       <header className="pt-safe sticky top-0 z-30 bg-cream/85 px-4 pb-3 backdrop-blur-xl">
         <div className="flex items-center gap-3 pt-2">
-          <Avatar mode={me} size="lg" />
+          {tab === 'home' && homeTitle ? (
+            <button onClick={() => history.back()} aria-label="Volver a Casa" className="grid size-12 shrink-0 place-items-center rounded-full bg-white shadow-sm active:scale-95">
+              <ChevronIcon className="size-5 rotate-180" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setTab(tab === 'settings' ? 'agenda' : 'settings')}
+              aria-label="Ajustes"
+              className="relative shrink-0 rounded-full active:scale-95"
+            >
+              <Avatar mode={me} size="lg" />
+              <span className="absolute -bottom-0.5 -right-0.5 grid size-5 place-items-center rounded-full bg-white text-ink shadow">
+                <SlidersIcon className="size-3" />
+              </span>
+            </button>
+          )}
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-muted">{tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : 'Vuestro espacio'}</p>
-            <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{TAB_TITLE[tab]}</h1>
+            <p className="text-sm font-medium text-muted">
+              {tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : tab === 'home' && homeTitle ? 'Casa · MEROE' : 'Vuestro espacio'}
+            </p>
+            <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{tab === 'home' && homeTitle ? homeTitle : TAB_TITLE[tab]}</h1>
           </div>
           <SyncBadge offline={sync.offline && !sync.loading} pending={sync.pending} />
         </div>
@@ -148,6 +173,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onToggle={onToggle}
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
           />
+        ) : tab === 'home' ? (
+          <HomeView me={me} onError={setToast} onTitle={setHomeTitle} />
         ) : (
           <SettingsView user={user} me={me} tags={tags} plans={plans} priorities={priorities} onError={setToast} />
         )}
@@ -155,7 +182,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       </main>
 
       {/* Botón de crear (flotante, abajo a la derecha, como en las apps de Android) */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
+      {tab !== 'home' && tab !== 'settings' && <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
         <button
           onClick={() => openSheet({ mode: 'new', kind: TAB_KIND[tab] })}
           aria-label={KINDS[TAB_KIND[tab]].new}
@@ -163,15 +190,15 @@ function Home({ user, me }: { user: User; me: PersonId }) {
         >
           <PlusIcon className="size-7" strokeWidth={2.5} />
         </button>
-      </div>
+      </div>}
 
       {/* Barra inferior */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-lg grid-cols-4 px-2 pt-2">
+        <div className="mx-auto grid max-w-lg grid-cols-4 px-1 pt-2">
           <NavButton active={tab === 'agenda'} onClick={() => setTab('agenda')} icon={<CalendarIcon className="size-6" />} label="Agenda" />
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
           <NavButton active={tab === 'tasks'} onClick={() => setTab('tasks')} icon={<CheckIcon className="size-6" strokeWidth={2.5} />} label="Tareas" />
-          <NavButton active={tab === 'settings'} onClick={() => setTab('settings')} icon={<SlidersIcon className="size-6" />} label="Ajustes" />
+          <NavButton active={tab === 'home'} onClick={() => setTab('home')} icon={<HomeIcon className="size-6" />} label="Casa" />
         </div>
       </nav>
 

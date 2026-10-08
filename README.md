@@ -15,6 +15,11 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Calendario** mensual: puntos de color por persona en cada día, repeticiones futuras en tono suave, y al tocar un día ves sus planes o añades uno nuevo con esa fecha.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
 - **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI).
+- **🗺️ Google Maps**: campo "Dónde" con sugerencias de sitios, mini mapa y botón **Ir** que abre la ruta más rápida en la app de Maps.
+- **🏡 Casa (cooperativa MEROE)**: portada con el resumen y espacios separados:
+  - *Plan de pagos*: precio + IVA (si sube, todo se recalcula), hitos en % o en euros, cuotas mensuales que se marcan solas el día de cobro (con ajuste manual), gastos de compra, muebles y ventas de Wallapop, barras por categoría y vista "Total / Cada uno".
+  - *Hipoteca*: simulador fija / variable / mixta con el Euríbor del BCE actualizado a diario, escenarios ±1 punto y gráfico del capital pendiente.
+  - *¿Llegamos?*: dinero de cada uno, ahorro mensual y previsión hasta la entrega con semáforo.
 - **Notificaciones push** (también con la app cerrada):
   - cuando el otro te asigna un plan, crea uno para los dos o completa algo;
   - recordatorios antes de la fecha tope (a la hora, 15 min, 1 h, 3 h, 1 día: cada uno elige los suyos en *Ajustes*);
@@ -39,7 +44,7 @@ Las envían unas Cloud Functions (`functions/`): una salta cuando cambia un plan
 
 1. **Plan Blaze**: las Cloud Functions lo requieren (*Firebase → ⚙️ → Uso y facturación → Cambiar plan*). Pide tarjeta, pero para dos personas el uso queda muy por debajo de la capa gratuita (≈8.600 ejecuciones/mes de 2 millones gratis). Recomendado: crea una **alerta de presupuesto** de 1 € en ese mismo panel.
 2. **Clave VAPID**: *⚙️ Configuración del proyecto → Cloud Messaging → Configuración web → Certificados push web → Generar par de claves*. Copia la clave en `VITE_FIREBASE_VAPID_KEY`.
-3. **Desplegar** las funciones y el índice (te pedirá vuestros dos emails la primera vez y los guarda en `functions/.env.<proyecto>`). No incluyas `firestore:rules` salvo que `firestore.rules` tenga ya vuestros emails, o sobrescribirá las reglas publicadas:
+3. **Desplegar** las funciones (avisos, recordatorios y Euríbor) y el índice (te pedirá vuestros dos emails la primera vez y los guarda en `functions/.env.<proyecto>`). No incluyas `firestore:rules` salvo que `firestore.rules` tenga ya vuestros emails, o sobrescribirá las reglas publicadas:
 
    ```bash
    npm --prefix functions install

@@ -72,3 +72,6 @@ export const PinIcon = (p: P) => (
 export const NavigateIcon = (p: P) => (
   <svg {...base} {...p}><path d="M3 11l18-8-8 18-2-8-8-2z" /></svg>
 )
+export const HomeIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M3 10.5L12 3l9 7.5M5 9.5V20h5v-6h4v6h5V9.5" /></svg>
+)
