@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_PREFS, activityPushes, formatRemaining, reminderPushes, rolloverDue, type PlanData } from './logic.js'
+import { DEFAULT_PREFS, activityPushes, digestPush, formatRemaining, normalizePrefs, reminderPushes, rolloverDue, type PlanData } from './logic.js'
 
 const H = 3_600_000
 const NOW = Date.parse('2026-10-06T10:00:00+02:00')
@@ -195,4 +195,78 @@ test('lee el CSV del BCE (con títulos entre comillas que llevan comas)', () => 
     { month: '2026-08', value: 2.153 },
   ])
   assert.throws(() => parseEcbCsv('A,B\n1,2'), /Formato del BCE inesperado/)
+})
+
+// ─── Resumen del día ────────────────────────────────────────────────────────
+
+test('resumen de la mañana: lo de hoy de cada uno, en orden, con atrasadas', () => {
+  const at = (iso: string) => new Date(iso).getTime()
+  const morning = at('2026-10-06T08:00:00')
+  const plans = [
+    plan({ id: 'a', kind: 'task', title: 'Arenero', assignee: 'nita', allDay: true, dueMs: allDayAt('2026-10-06') }),
+    plan({ id: 'b', kind: 'event', title: 'Dentista', assignee: 'nita', dueMs: at('2026-10-06T10:30:00') }),
+    plan({ id: 'c', kind: 'plan', title: 'Cena', assignee: 'both', dueMs: at('2026-10-06T21:00:00') }),
+    plan({ id: 'd', kind: 'task', title: 'Bici', assignee: 'kitos', dueMs: at('2026-10-06T12:00:00') }),
+    plan({ id: 'e', kind: 'task', title: 'Pagar luz', assignee: 'nita', dueMs: at('2026-10-04T12:00:00') }),
+    plan({ id: 'f', kind: 'task', title: 'Hecho', assignee: 'nita', done: true, dueMs: at('2026-10-06T09:00:00') }),
+    plan({ id: 'g', kind: 'event', title: 'Boda', assignee: 'both', dueMs: at('2026-10-07T12:00:00') }),
+  ]
+  const n = digestPush('nita', plans, morning)!
+  assert.equal(n.title, '☀️ Buenos días, Nita')
+  assert.equal(n.body, '📅 Dentista 10:30 · 💞 Cena 21:00 · 🧹 Arenero\n⚠️ 1 pendiente atrasada')
+  assert.equal(digestPush('kitos', plans, morning)!.body, '🧹 Bici 12:00 · 💞 Cena 21:00')
+  assert.equal(digestPush('kitos', [plans[6]], morning), null)
+})
+
+test('preferencias nuevas con valores por defecto', () => {
+  assert.deepEqual(normalizePrefs({ leads: [15] }), { activity: true, reminders: true, leads: [15], digest: true, digestHour: 8, home: true })
+  assert.equal(normalizePrefs({ digestHour: 30 }).digestHour, 8)
+})
+
+// ─── Avisos de la casa ──────────────────────────────────────────────────────
+
+import { homePushes, paymentsTomorrow } from './homeAlerts.js'
+import type { HomeConfig, HomeItem } from './home.js'
+
+const homeCfg: HomeConfig = {
+  name: 'Test', basePrice: 300000, vatRate: 0.1, handover: '2028-10',
+  mortgage: { pct: 0.8, years: 30, type: 'fixed', fixedRate: 2, spread: 0.6, mixedYears: 10, manualEuribor: null },
+  monthlySaving: { nita: 0, kitos: 0 },
+}
+const hItem = (o: Partial<HomeItem>): HomeItem => ({ id: 'x', title: 'x', category: 'cooperativa', amount: { type: 'fixed', value: 500 }, monthly: null, date: null, paid: false, countsTowardPrice: true, income: false, notes: '', ...o })
+const homePrefs = { nita: DEFAULT_PREFS, kitos: DEFAULT_PREFS }
+
+test('casa: la víspera de la cuota del día 5 avisa a los dos', () => {
+  const items = [hItem({ title: 'Cuotas mensuales', monthly: { count: 24, day: 5, start: '2026-07', paidOverride: null } })]
+  const eve = new Date('2026-11-04T20:00:00')
+  assert.deepEqual(paymentsTomorrow(items, homeCfg, eve), [{ title: 'Cuotas mensuales', amount: 500, detail: 'cuota 5 de 24' }])
+  const p = homePushes(items, [], homeCfg, homePrefs, eve)
+  assert.deepEqual(p.map((x) => x.to), ['nita', 'kitos'])
+  assert.equal(p[0].title.replace(/\s/g, ' '), '🏗️ Mañana se paga: 500 €')
+  assert.equal(homePushes(items, [], homeCfg, homePrefs, new Date('2026-11-03T20:00:00')).length, 0)
+  // Quien desactiva los avisos de la casa no lo recibe
+  assert.deepEqual(homePushes(items, [], homeCfg, { ...homePrefs, kitos: { ...DEFAULT_PREFS, home: false } }, eve).map((x) => x.to), ['nita'])
+})
+
+test('casa: pagos sueltos con fecha y miles con punto', () => {
+  const items = [hItem({ title: 'Notaría', amount: { type: 'fixed', value: 1300 }, date: '2026-11-05' }), hItem({ title: 'Ya pagado', date: '2026-11-05', paid: true })]
+  const p = homePushes(items, [], homeCfg, homePrefs, new Date('2026-11-04T20:00:00'))
+  assert.equal(p[0].title.replace(/\s/g, ' '), '🏗️ Mañana se paga: 1.300 €')
+})
+
+test('casa: el día 1, recordatorio de ahorro solo a quien no lo ha actualizado', () => {
+  const now = new Date('2026-12-01T20:00:00')
+  const funds = [
+    { id: 'a', name: 'Cuenta Nita', owner: 'nita' as const, amount: 1000, updatedAt: now.getTime() - 3 * 86400000 },
+    { id: 'b', name: 'Cuenta Kitos', owner: 'kitos' as const, amount: 1000, updatedAt: now.getTime() - 40 * 86400000 },
+  ]
+  const p = homePushes([], funds, homeCfg, homePrefs, now)
+  assert.deepEqual(p.map((x) => x.to), ['kitos'])
+  assert.equal(homePushes([], funds, homeCfg, homePrefs, new Date('2026-12-02T20:00:00')).length, 0)
+})
+
+test('src/home.ts es idéntico al de la app', () => {
+  const here = fileURLToPath(new URL('../src/home.ts', import.meta.url))
+  const app = fileURLToPath(new URL('../../src/lib/home.ts', import.meta.url))
+  assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
 })

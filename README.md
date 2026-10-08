@@ -15,6 +15,9 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Calendario** mensual: puntos de color por persona en cada día, repeticiones futuras en tono suave, y al tocar un día ves sus planes o añades uno nuevo con esa fecha.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
 - **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI).
+- **🛒 Lista de la compra** compartida en tiempo real, por secciones, con "lo de siempre" (aprende lo que compráis).
+- **☀️ Resumen del día**: cada mañana, a la hora que elija cada uno, un aviso con lo de hoy; y la franja "Hoy para ti" en la Agenda.
+- **🏗️ Avisos de la casa**: la víspera de cada pago de la cooperativa, y el día 1 recordatorio para actualizar el ahorro.
 - **🗺️ Google Maps**: campo "Dónde" con sugerencias de sitios, mini mapa y botón **Ir** que abre la ruta más rápida en la app de Maps.
 - **🏡 Casa (cooperativa MEROE)**: portada con el resumen y espacios separados:
   - *Plan de pagos*: precio + IVA (si sube, todo se recalcula), hitos en % o en euros, cuotas mensuales que se marcan solas el día de cobro (con ajuste manual), gastos de compra, muebles y ventas de Wallapop, barras por categoría y vista "Total / Cada uno".

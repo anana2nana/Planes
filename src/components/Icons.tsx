@@ -75,3 +75,6 @@ export const NavigateIcon = (p: P) => (
 export const HomeIcon = (p: P) => (
   <svg {...base} {...p}><path d="M3 10.5L12 3l9 7.5M5 9.5V20h5v-6h4v6h5V9.5" /></svg>
 )
+export const CartIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M3 4h2l2.2 11h10.6L20 7H6.2" /><circle cx="9" cy="19.5" r="1.5" /><circle cx="17" cy="19.5" r="1.5" /></svg>
+)

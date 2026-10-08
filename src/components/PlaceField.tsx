@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { isMapsConfigured, loadMap, loadPlaces, resolvePlace, searchPlaces, type Suggestion } from '../lib/maps'
 import type { PlaceInfo } from '../lib/types'
-import { CloseIcon, PinIcon } from './Icons'
+import { CloseIcon, NavigateIcon, PinIcon } from './Icons'
+import { DirectionsLink } from './DirectionsLink'
 
 /** Campo "Dónde": sugiere sitios de Google Maps mientras escribes. Sin conexión o sin clave, vale texto libre. */
 export function PlaceField({ value, onChange }: { value: PlaceInfo | null; onChange: (p: PlaceInfo | null) => void }) {
@@ -81,6 +82,12 @@ export function PlaceField({ value, onChange }: { value: PlaceInfo | null; onCha
             <CloseIcon className="size-4" />
           </button>
         </div>
+        <DirectionsLink
+          place={value}
+          className="flex items-center justify-center gap-2 border-t border-stone-100 bg-sky-50 py-2.5 text-sm font-bold text-sky-700 active:bg-sky-100"
+        >
+          <NavigateIcon className="size-4" /> Cómo llegar
+        </DirectionsLink>
       </div>
     )
   }

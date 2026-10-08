@@ -11,9 +11,12 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
 import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
+import { homePushes } from './homeAlerts.js'
+import type { Amount, CategoryId, Fund, HomeConfig, HomeItem, MonthlySchedule } from './home.js'
 import {
   LATE_GRACE_MIN,
   activityPushes,
+  digestPush,
   normalizePrefs,
   reminderPushes,
   rolloverDue,
@@ -198,4 +201,75 @@ export const refreshEuribor = onCall(async (req) => {
   } catch (e) {
     throw new HttpsError('unavailable', (e as Error).message)
   }
+})
+
+// ─── Resumen de la mañana ──────────────────────────────────────────────────
+
+/** Cada hora en punto: a quien tenga el resumen a esta hora, le manda lo de hoy. */
+export const dailyDigest = onSchedule({ schedule: '0 * * * *', timeZone: 'Europe/Madrid' }, async () => {
+  const now = new Date()
+  const prefs = await loadPrefs()
+  const people = (['nita', 'kitos'] as const).filter((p) => prefs[p].digest && prefs[p].digestHour === now.getHours())
+  if (people.length === 0) return
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const snap = await db.collection('plans').where('done', '==', false).where('dueAt', '<', Timestamp.fromDate(endOfToday)).get()
+  const plans = snap.docs.map((d) => toPlan(d)!)
+  for (const person of people) {
+    const push = digestPush(person, plans, now.getTime())
+    if (push) await send(push)
+  }
+})
+
+// ─── Avisos de la casa (cooperativa) ───────────────────────────────────────
+
+function parseHome(d: Record<string, unknown> | undefined): HomeConfig | null {
+  if (!d || typeof d.basePrice !== 'number') return null
+  const m = (d.mortgage ?? {}) as Partial<HomeConfig['mortgage']>
+  const s = (d.monthlySaving ?? {}) as Partial<HomeConfig['monthlySaving']>
+  return {
+    name: typeof d.name === 'string' ? d.name : 'MEROE',
+    basePrice: d.basePrice,
+    vatRate: typeof d.vatRate === 'number' ? d.vatRate : 0.1,
+    handover: typeof d.handover === 'string' ? d.handover : '2028-10',
+    mortgage: { pct: 0.8, years: 30, type: 'fixed', fixedRate: 2.5, spread: 0.7, mixedYears: 10, manualEuribor: null, ...m },
+    monthlySaving: { nita: s.nita ?? 0, kitos: s.kitos ?? 0 },
+  }
+}
+
+function parseHomeItem(id: string, x: Record<string, any>): HomeItem {
+  const a = x.amount as Partial<Amount> | undefined
+  const amount: Amount =
+    a?.type === 'pctTotal' || a?.type === 'pctBase' ? { type: a.type, value: Number(a.value) || 0 } : { type: 'fixed', value: Number(a?.value) || 0 }
+  const m = x.monthly as Partial<MonthlySchedule> | null | undefined
+  return {
+    id,
+    title: x.title ?? '',
+    category: (x.category ?? 'otros') as CategoryId,
+    amount,
+    monthly:
+      m && typeof m.count === 'number' && typeof m.start === 'string'
+        ? { count: m.count, day: m.day ?? 1, start: m.start, paidOverride: typeof m.paidOverride === 'number' ? m.paidOverride : null }
+        : null,
+    date: typeof x.date === 'string' ? x.date : null,
+    paid: x.paid === true,
+    countsTowardPrice: x.countsTowardPrice === true,
+    income: x.income === true,
+    notes: x.notes ?? '',
+  }
+}
+
+/** Cada tarde a las 20:00: pagos de mañana y, el día 1, recordatorio de actualizar el ahorro. */
+export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Europe/Madrid' }, async () => {
+  const cfg = parseHome((await db.doc('home/meroe').get()).data())
+  if (!cfg) return
+  const [itemsSnap, fundsSnap, prefs] = await Promise.all([db.collection('homeItems').get(), db.collection('homeFunds').get(), loadPrefs()])
+  const items = itemsSnap.docs.map((d) => parseHomeItem(d.id, d.data()))
+  const funds: Fund[] = fundsSnap.docs.map((d) => ({
+    id: d.id,
+    name: d.get('name') ?? '',
+    owner: d.get('owner') ?? 'both',
+    amount: Number(d.get('amount')) || 0,
+    updatedAt: d.get('updatedAt') instanceof Timestamp ? (d.get('updatedAt') as Timestamp).toMillis() : null,
+  }))
+  for (const push of homePushes(items, funds, cfg, prefs, new Date())) await send(push)
 })

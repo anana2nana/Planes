@@ -71,6 +71,15 @@ service cloud.firestore {
         && request.resource.data.owner in ['nita', 'kitos', 'both'];
     }
 
+    // Lista de la compra.
+    match /shopping/{itemId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+        && request.resource.data.done is bool;
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();

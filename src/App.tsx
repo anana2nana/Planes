@@ -12,9 +12,10 @@ import { KINDS } from './lib/kinds'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
-import { CalendarIcon, CheckIcon, ChevronIcon, CloudOffIcon, HomeIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
+import { CalendarIcon, CartIcon, CheckIcon, ChevronIcon, CloudOffIcon, HomeIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
 import { CalendarView } from './components/CalendarView'
 import { HomeView } from './components/home/HomeView'
+import { ShoppingView } from './components/ShoppingView'
 import { PlanForm } from './components/PlanForm'
 import { PlansView } from './components/PlansView'
 import { SettingsView } from './components/SettingsView'
@@ -28,12 +29,12 @@ export default function App() {
   return <Home user={auth.user} me={auth.me} />
 }
 
-type Tab = 'agenda' | 'plans' | 'tasks' | 'home' | 'settings'
+type Tab = 'agenda' | 'plans' | 'tasks' | 'shopping' | 'home' | 'settings'
 type Sheet = { mode: 'new'; kind?: Kind; date?: string } | { mode: 'edit'; id: string } | null
 
 /** Tipo por defecto al pulsar + en cada pestaña. */
-const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', home: 'plan', settings: 'plan' }
-const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', home: 'Casa', settings: 'Ajustes' }
+const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', shopping: 'task', home: 'plan', settings: 'plan' }
+const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', shopping: 'Lista de la compra', home: 'Casa', settings: 'Ajustes' }
 
 function greeting() {
   const h = new Date().getHours()
@@ -172,7 +173,10 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
+            onGoTasks={() => setTab('tasks')}
           />
+        ) : tab === 'shopping' ? (
+          <ShoppingView me={me} onToast={setToast} />
         ) : tab === 'home' ? (
           <HomeView me={me} onError={setToast} onTitle={setHomeTitle} />
         ) : (
@@ -182,7 +186,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       </main>
 
       {/* Botón de crear (flotante, abajo a la derecha, como en las apps de Android) */}
-      {tab !== 'home' && tab !== 'settings' && <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
+      {tab !== 'home' && tab !== 'settings' && tab !== 'shopping' && <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
         <button
           onClick={() => openSheet({ mode: 'new', kind: TAB_KIND[tab] })}
           aria-label={KINDS[TAB_KIND[tab]].new}
@@ -194,10 +198,11 @@ function Home({ user, me }: { user: User; me: PersonId }) {
 
       {/* Barra inferior */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-lg grid-cols-4 px-1 pt-2">
+        <div className="mx-auto grid max-w-lg grid-cols-5 px-1 pt-2">
           <NavButton active={tab === 'agenda'} onClick={() => setTab('agenda')} icon={<CalendarIcon className="size-6" />} label="Agenda" />
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
           <NavButton active={tab === 'tasks'} onClick={() => setTab('tasks')} icon={<CheckIcon className="size-6" strokeWidth={2.5} />} label="Tareas" />
+          <NavButton active={tab === 'shopping'} onClick={() => setTab('shopping')} icon={<CartIcon className="size-6" />} label="Compra" />
           <NavButton active={tab === 'home'} onClick={() => setTab('home')} icon={<HomeIcon className="size-6" />} label="Casa" />
         </div>
       </nav>
@@ -233,7 +238,7 @@ function NavButton({ active, onClick, icon, label }: { active: boolean; onClick:
       aria-current={active ? 'page' : undefined}
       className={`flex flex-col items-center gap-1 py-1 text-[11px] font-bold transition ${active ? 'text-ink' : 'text-stone-400'}`}
     >
-      <span className={`grid h-8 w-14 place-items-center rounded-full transition ${active ? 'bg-both-soft text-both' : ''}`}>{icon}</span>
+      <span className={`grid h-8 w-12 place-items-center rounded-full transition ${active ? 'bg-both-soft text-both' : ''}`}>{icon}</span>
       {label}
     </button>
   )

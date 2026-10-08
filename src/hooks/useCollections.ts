@@ -120,7 +120,7 @@ export function usePriorities(): PriorityConfig {
   return config
 }
 
-export const DEFAULT_NOTIF_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440] }
+export const DEFAULT_NOTIF_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440], digest: true, digestHour: 8, home: true }
 
 export function useNotifPrefs(): Record<PersonId, NotifPrefs> {
   const [prefs, setPrefs] = useState({ nita: DEFAULT_NOTIF_PREFS, kitos: DEFAULT_NOTIF_PREFS })

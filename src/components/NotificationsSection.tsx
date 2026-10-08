@@ -110,6 +110,27 @@ export function NotificationsSection({ me, onError }: { me: PersonId; onError: (
               </div>
             </div>
           )}
+          <Toggle label="☀️ Resumen de cada mañana con lo de hoy" checked={prefs.digest} onChange={(v) => update({ digest: v })} />
+          {prefs.digest && (
+            <div className="px-4 py-3">
+              <p className="mb-2 text-xs font-semibold text-muted">¿A qué hora?</p>
+              <div className="flex flex-wrap gap-2">
+                {[6, 7, 8, 9, 10].map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => update({ digestHour: h })}
+                    aria-pressed={prefs.digestHour === h}
+                    className={`rounded-full px-3 py-1.5 text-sm font-semibold transition active:scale-95 ${
+                      prefs.digestHour === h ? 'bg-both text-white' : 'bg-stone-100 text-ink'
+                    }`}
+                  >
+                    {h}:00
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <Toggle label="🏗️ Avisos de la casa (pago de mañana, ahorro)" checked={prefs.home} onChange={(v) => update({ home: v })} />
           <div className="px-4 py-3">
             <button onClick={test} disabled={busy} className="text-sm font-bold text-both disabled:opacity-50">
               {testSent ? '¡Enviada! Debería llegarte en unos segundos' : 'Enviarme una notificación de prueba'}

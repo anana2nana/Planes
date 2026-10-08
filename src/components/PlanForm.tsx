@@ -75,8 +75,11 @@ function quickDates() {
 }
 
 export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me, tags, priorities, onClose, onError }: Props) {
-  const [draft, setDraft] = useState<PlanDraft>(() => initialDraft(plan, defaultKind, defaultDate))
+  const [initial] = useState<PlanDraft>(() => initialDraft(plan, defaultKind, defaultDate))
+  const [draft, setDraft] = useState<PlanDraft>(initial)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // Al abrir algo ya creado no se muestra "Guardar" hasta que se cambia algo.
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial)
   const set = <K extends keyof PlanDraft>(k: K, v: PlanDraft[K]) => setDraft((d) => ({ ...d, [k]: v }))
 
   const kind = KINDS[draft.kind]
@@ -110,31 +113,20 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
     onClose()
   }
 
-  const footer = (
-    <div className="flex gap-2">
-      {isEdit && (
-        <button
-          type="button"
-          onClick={() => setConfirmDelete((v) => !v)}
-          className="grid size-13 shrink-0 place-items-center rounded-2xl bg-rose-50 text-rose-600 active:scale-95"
-          aria-label="Borrar"
-        >
-          <TrashIcon className="size-5" />
-        </button>
-      )}
+  const footer =
+    !isEdit || dirty ? (
       <button
         type="submit"
         form="plan-form"
         disabled={!canSave}
-        className="h-13 flex-1 rounded-2xl bg-ink text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-30"
+        className="h-13 w-full animate-fade-in rounded-2xl bg-ink text-base font-bold text-white transition active:scale-[0.98] disabled:opacity-30"
       >
         {isEdit ? 'Guardar cambios' : draft.mode === 'duplicate' ? 'Crear para los dos' : `Crear ${kind.one.toLowerCase()}`}
       </button>
-    </div>
-  )
+    ) : undefined
 
   return (
-    <BottomSheet open onClose={onClose} title={isEdit ? `Editar ${kind.one.toLowerCase()}` : kind.new} footer={footer}>
+    <BottomSheet open onClose={onClose} title={isEdit ? `${kind.emoji} ${kind.one}` : kind.new} footer={footer}>
       <form
         id="plan-form"
         onSubmit={(e) => {
@@ -143,32 +135,6 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
         }}
         className="space-y-6"
       >
-        {confirmDelete && plan && (
-          <div className="animate-fade-in space-y-2 rounded-2xl bg-rose-50 p-3">
-            <p className="text-sm font-semibold text-rose-700">
-              ¿Seguro que quieres borrarl{kind.article === 'un' ? 'o' : 'a'}?
-              {plan.repeat && ' Dejará de repetirse.'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => remove([plan.id])} className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-bold text-white">
-                {isDuplicated ? 'Solo esta copia' : 'Sí, borrar'}
-              </button>
-              {isDuplicated && siblings.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => remove([plan.id, ...siblings.map((s) => s.id)])}
-                  className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-bold text-white"
-                >
-                  Borrar las dos copias
-                </button>
-              )}
-              <button type="button" onClick={() => setConfirmDelete(false)} className="rounded-xl px-3 py-2 text-sm font-semibold text-rose-700">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Tipo */}
         <div className="grid grid-cols-3 gap-1 rounded-2xl bg-stone-100 p-1" role="radiogroup" aria-label="Tipo">
           {KIND_ORDER.map((k) => (
@@ -338,6 +304,42 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, siblings, me
         <Field icon={<TagIcon className="size-4" />} label="Etiquetas (opcional)">
           <TagPicker tags={tags} value={draft.tagIds} onChange={(ids) => set('tagIds', ids)} />
         </Field>
+
+        {isEdit && !confirmDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="mx-auto flex items-center gap-1.5 py-2 text-sm font-semibold text-rose-600"
+          >
+            <TrashIcon className="size-4" /> Borrar {kind.article === 'un' ? 'este' : 'esta'} {kind.one.toLowerCase()}
+          </button>
+        )}
+        {confirmDelete && plan && (
+          <div className="animate-fade-in space-y-2 rounded-2xl bg-rose-50 p-3" ref={(el) => el?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+            <p className="text-sm font-semibold text-rose-700">
+              ¿Seguro que quieres borrarl{kind.article === 'un' ? 'o' : 'a'}?
+              {plan.repeat && ' Dejará de repetirse.'}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => remove([plan.id])} className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-bold text-white">
+                {isDuplicated ? 'Solo esta copia' : 'Sí, borrar'}
+              </button>
+              {isDuplicated && siblings.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => remove([plan.id, ...siblings.map((s) => s.id)])}
+                  className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-bold text-white"
+                >
+                  Borrar las dos copias
+                </button>
+              )}
+              <button type="button" onClick={() => setConfirmDelete(false)} className="rounded-xl px-3 py-2 text-sm font-semibold text-rose-700">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
       </form>
     </BottomSheet>
   )

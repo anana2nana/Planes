@@ -92,4 +92,9 @@ export interface NotifPrefs {
   reminders: boolean
   /** Minutos de antelación (0 = a la hora). */
   leads: number[]
+  /** Resumen de cada mañana con lo de hoy, y a qué hora (0-23). */
+  digest: boolean
+  digestHour: number
+  /** Avisos de la casa: pago de mañana, actualizar el ahorro. */
+  home: boolean
 }

@@ -9,6 +9,7 @@ import { Avatar } from './Avatar'
 import { ChevronIcon, NavigateIcon, PlusIcon, RepeatIcon } from './Icons'
 import { DirectionsLink } from './DirectionsLink'
 import { PlanCard } from './PlanCard'
+import { TodayStrip } from './TodayStrip'
 
 interface Props {
   plans: Plan[]
@@ -19,6 +20,8 @@ interface Props {
   onToggle: (plan: Plan) => void
   /** Crear un plan nuevo en esa fecha (yyyy-mm-dd). */
   onCreate: (date: string) => void
+  /** Ir a la pestaña Tareas (desde el aviso de atrasadas). */
+  onGoTasks: () => void
 }
 
 /** Una entrada del calendario: un plan real o una repetición futura (aún no creada). */
@@ -38,7 +41,7 @@ const sameDay = (a: Date, b: Date) => dayKey(a) === dayKey(b)
 
 const DOT: Record<Plan['assignee'], string> = { nita: 'bg-nita', kitos: 'bg-kitos', both: 'bg-both' }
 
-export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, onCreate }: Props) {
+export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, onCreate, onGoTasks }: Props) {
   const now = useNow(60_000)
   const today = new Date(now)
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
@@ -107,6 +110,8 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
 
   return (
     <div className="space-y-5">
+      <TodayStrip plans={plans} me={me} onOpen={onOpen} onGoTasks={onGoTasks} />
+
       <section className="rounded-3xl bg-white p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
         <div className="mb-3 flex items-center gap-2">
           <h2 className="flex-1 text-lg font-extrabold">{capitalize(monthFmt.format(month))}</h2>

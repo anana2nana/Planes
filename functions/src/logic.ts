@@ -44,9 +44,15 @@ export interface NotifPrefs {
   reminders: boolean
   /** Con cuántos minutos de antelación (0 = a la hora). */
   leads: number[]
+  /** Resumen de cada mañana con lo de hoy. */
+  digest: boolean
+  /** Hora del resumen (0-23, hora de España). */
+  digestHour: number
+  /** Avisos de la casa (cuota de mañana, actualizar el ahorro). */
+  home: boolean
 }
 
-export const DEFAULT_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440] }
+export const DEFAULT_PREFS: NotifPrefs = { activity: true, reminders: true, leads: [60, 1440], digest: true, digestHour: 8, home: true }
 
 export interface Push {
   to: Person
@@ -66,6 +72,9 @@ export function normalizePrefs(raw: Partial<NotifPrefs> | undefined): NotifPrefs
     activity: raw?.activity ?? DEFAULT_PREFS.activity,
     reminders: raw?.reminders ?? DEFAULT_PREFS.reminders,
     leads: Array.isArray(raw?.leads) ? raw.leads.filter((n) => typeof n === 'number' && n >= 0) : DEFAULT_PREFS.leads,
+    digest: raw?.digest ?? DEFAULT_PREFS.digest,
+    digestHour: typeof raw?.digestHour === 'number' && raw.digestHour >= 0 && raw.digestHour <= 23 ? raw.digestHour : DEFAULT_PREFS.digestHour,
+    home: raw?.home ?? DEFAULT_PREFS.home,
   }
 }
 
@@ -252,4 +261,33 @@ export function rolloverDue(plan: Pick<PlanData, 'kind' | 'repeat' | 'dueMs' | '
   if (nowMs - endMs < LATE_GRACE_MIN * 60_000) return null
   const next = nextOccurrence(new Date(plan.dueMs), plan.repeat, new Date(nowMs))
   return next ? next.getTime() : null
+}
+
+// ─── Resumen del día ────────────────────────────────────────────────────────
+
+const timeOf = (ms: number) => new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(ms)
+const EMOJI: Record<Kind, string> = { event: '📅', plan: '💞', task: '🧹' }
+
+/**
+ * Resumen de la mañana para una persona: lo de hoy (citas, planes, tareas suyas o de los dos)
+ * y cuántas tareas/planes arrastra de días anteriores. null si no hay nada.
+ */
+export function digestPush(person: Person, plans: PlanData[], nowMs: number): Push | null {
+  const now = new Date(nowMs)
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
+  const mine = plans.filter((p) => !p.done && p.dueMs !== null && targetsOf(p.assignee).includes(person))
+  const today = mine.filter((p) => p.dueMs! >= start && p.dueMs! < end).sort((a, b) => a.dueMs! - b.dueMs!)
+  const overdue = mine.filter((p) => p.kind !== 'event' && p.dueMs! < start).length
+  if (today.length === 0 && overdue === 0) return null
+
+  const MAX = 4
+  const parts = today.slice(0, MAX).map((p) => {
+    const emoji = p.kind === 'event' && p.repeat?.yearly ? '🎂' : EMOJI[p.kind]
+    return `${emoji} ${p.title}${p.allDay ? '' : ` ${timeOf(p.dueMs!)}`}`
+  })
+  if (today.length > MAX) parts.push(`y ${today.length - MAX} más`)
+  const late = overdue ? `⚠️ ${overdue} ${overdue === 1 ? 'pendiente atrasada' : 'pendientes atrasadas'}` : ''
+  const body = parts.length ? [parts.join(' · '), late].filter(Boolean).join('\n') : `Nada para hoy. ${late}`
+  return { to: person, kind: 'reminder', title: `☀️ Buenos días, ${NAME[person]}`, body, tag: 'digest' }
 }

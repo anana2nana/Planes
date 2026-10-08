@@ -21,12 +21,15 @@ App web móvil privada para una pareja: **Nita** (la dueña del repo, poco técn
 
 Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (Auth con Google, Firestore en tiempo real con caché persistente, Cloud Messaging) · Cloud Functions v2 (Node 22).
 
-- `src/App.tsx` — pestañas **Agenda / Planes / Tareas / Casa** (Ajustes: tocando el avatar de arriba), botón + (crea el tipo de la pestaña), hoja de edición (ocupa una entrada del historial para que el "atrás" de Android la cierre).
+- `src/App.tsx` — pestañas **Agenda / Planes / Tareas / Compra / Casa** (Ajustes: tocando el avatar de arriba), botón + (crea el tipo de la pestaña), hoja de edición (ocupa una entrada del historial para que el "atrás" de Android la cierre).
 - `src/lib/` — `types.ts`, `kinds.ts` (textos por tipo), `recurrence.ts` (repeticiones), `time.ts`, `people.ts`, `push.ts` (FCM), `firebase.ts`.
 - `src/services/plans.ts` — todas las escrituras. No se espera a `commit()` en la UI (funciona offline).
 - `src/components/` — `CalendarView` (Agenda), `PlansView` (listas de planes/tareas), `PlanForm`, `PlanCard`, `SettingsView`, `NotificationsSection`, `ErrorBoundary`…
 - `public/sw.js` — service worker que muestra los push (mensajes solo de datos).
-- `functions/src/` — `index.ts` (triggers), `logic.ts` (qué avisar, puro y testeado), `recurrence.ts` (**copia idéntica** de `src/lib/recurrence.ts`; un test lo comprueba).
+- `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts` y `home.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
+- Funciones programadas: `sendReminders` (cada 5 min), `dailyDigest` (cada hora; manda el resumen a quien lo tenga a esa hora, `digestHour` en `config/notifications`), `homeReminders` (20:00: pagos de MEROE de mañana; el día 1, recordatorio de actualizar el ahorro), `updateEuribor` (8:30).
+- **Lista de la compra**: `shopping` (un doc por cosa) + `config/shopping.items` (lo que suelen comprar: veces y sección, para sugerencias). `ShoppingView`.
+- Agenda: franja `TodayStrip` ("Hoy para ti"). Formulario de planes: "Guardar cambios" solo aparece si hay cambios (`dirty`).
 
 ## Casa (cooperativa MEROE)
 
@@ -66,6 +69,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 
 ## Ideas pendientes
 
+Propuestas a Nita y aún sin hacer: ver las citas en Google Calendar (feed iCal), lista de "algún día" con "¿qué hacemos hoy?", espacio para la gata, modo oscuro, contador de aniversario.
+
 - Muebles: presupuesto por categoría con barra (ahora solo pagado/previsto) y fotos de tickets.
-- Aviso push el día antes de cada cuota de la cooperativa.
 - Confirmar con Nita: ¿la reserva (5.000 €) se descuenta del precio? ¿AJD de su comunidad? ("12 meses de obra" = un único pago; falta saber la fecha).
