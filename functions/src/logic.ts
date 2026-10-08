@@ -307,3 +307,32 @@ export function specialDay(since: string, now: Date): string | null {
   if (days > 0 && days % 100 === 0) return `💞 ¡Hoy hacéis ${days.toLocaleString('es-ES', { useGrouping: 'always' })} días juntos!`
   return null
 }
+
+// ─── Menú de la semana ──────────────────────────────────────────────────────
+
+export interface MealLite {
+  slot: 'comida' | 'cena'
+  title: string
+  eat?: Partial<Record<Person, 'casa' | 'taper' | 'fuera'>>
+}
+
+/** Línea del resumen de la mañana con lo que come hoy esa persona (si no come fuera). */
+export function mealLine(meals: MealLite[], person: Person): string | null {
+  const mine = meals.filter((m) => m.title && m.eat?.[person] !== 'fuera').sort((a, b) => Number(a.slot === 'cena') - Number(b.slot === 'cena'))
+  if (mine.length === 0) return null
+  return '🍝 ' + mine.map((m) => `${m.slot === 'cena' ? 'Cena' : 'Comida'}: ${m.title}${m.eat?.[person] === 'taper' ? ' (🥡 táper)' : ''}`).join(' · ')
+}
+
+/** Domingo por la tarde: si la semana que viene está casi vacía, recordar hacer el menú. */
+export function menuReminder(now: Date, plannedNextWeek: number, prefs: Record<Person, NotifPrefs>): Push[] {
+  if (now.getDay() !== 0 || plannedNextWeek >= 3) return []
+  return (['nita', 'kitos'] as Person[])
+    .filter((p) => prefs[p].home)
+    .map((p) => ({
+      to: p,
+      kind: 'reminder' as const,
+      title: '🍝 ¿Hacemos el menú de la semana?',
+      body: plannedNextWeek === 0 ? 'Aún no hay nada para la semana que viene. Apuntadlo en Comida → Menú y pasad los ingredientes a la compra.' : `Solo hay ${plannedNextWeek} ${plannedNextWeek === 1 ? 'comida apuntada' : 'comidas apuntadas'} para la semana que viene.`,
+      tag: 'menu-week',
+    }))
+}

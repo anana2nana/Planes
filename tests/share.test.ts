@@ -23,7 +23,13 @@ test('compartir una tienda → regalo; una lista → compra; un texto largo → 
   const c = parseShared({ text: '- leche\n- 2 huevos\n• pan de molde\n3) tomates' })
   assert.equal(c.suggested, 'shopping')
   assert.deepEqual(c.lines, ['leche', '2 huevos', 'pan de molde', 'tomates'])
-  const n = parseShared({ text: 'La receta de la abuela: se sofríe la cebolla a fuego lento durante media hora y luego se añade el tomate' })
+  const n = parseShared({ text: 'Lo que dijo el administrador: la derrama de la comunidad se paga en dos plazos, en enero y en junio' })
   assert.equal(n.suggested, 'note')
   assert.equal(parseShared({ url: 'https://www.instagram.com/p/abc/' }).suggested, 'idea')
+})
+
+test('compartir un vídeo de TikTok o algo con "receta" → receta', () => {
+  assert.equal(parseShared({ text: 'https://vm.tiktok.com/ZGabc123/' }).suggested, 'recipe')
+  assert.equal(parseShared({ title: 'Receta de croquetas', text: 'https://www.instagram.com/reel/xyz/' }).suggested, 'recipe')
+  assert.equal(parseShared({ text: 'https://www.instagram.com/reel/xyz/' }).suggested, 'idea')
 })

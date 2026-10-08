@@ -15,6 +15,7 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **Calendario** mensual: puntos de color por persona en cada día, repeticiones futuras en tono suave, y al tocar un día ves sus planes o añades uno nuevo con esa fecha.
 - **Prioridades y etiquetas** con colores personalizables (paleta + selector libre) desde *Ajustes*, sincronizados para los dos.
 - **Privada**: solo vuestros dos emails pueden entrar, garantizado por las reglas de Firestore (no solo por la UI).
+- **🍝 Menú de la semana y recetas** (pestaña Comida): comidas de cada día y cenas del finde, quién lleva táper, quién cocina, recetario con el enlace al vídeo y sus ingredientes, y un botón que pasa los ingredientes de la semana a la compra.
 - **🛒 Lista de la compra** compartida en tiempo real, por secciones, con "lo de siempre" (aprende lo que compráis).
 - **☀️ Resumen del día**: cada mañana, a la hora que elija cada uno, un aviso con lo de hoy; y la franja "Hoy para ti" en la Agenda.
 - **🏗️ Avisos de la casa**: la víspera de cada pago de la cooperativa, y el día 1 recordatorio para actualizar el ahorro.
@@ -136,6 +137,8 @@ firestore.rules           # 🔒 Acceso solo para vosotros dos + validación de 
 | `receipts/{id}` | `itemId, data (JPEG comprimido, data URL), addedBy` |
 | `pet/profile` · `petCare/{id}` | ficha de la gata · `title, every {n, unit}, last, history[]` |
 | `config/couple` · `config/calendar` | `since, birthdays {nita, kitos: "MM-DD"}` · `token` (enlace secreto del calendario) |
+| `meals/{fecha_comida\|cena}` | `date, slot, title, recipeId, cook, eat {nita, kitos: casa\|taper\|fuera}, notes` |
+| `recipes/{id}` | `title, emoji, url, ingredients[], steps, servings, lastPlanned` |
 | `gifts/{id}` | `owner (solo lo lee su dueño), title, occasion, url, price, notes, status` |
 | `notes/{id}` | `emoji, title, body, pinned, updatedAt, updatedBy` |
 | `devices/{token}` | `token, person, userAgent, updatedAt` (un documento por móvil con push activado) |

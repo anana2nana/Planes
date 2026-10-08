@@ -1,6 +1,6 @@
 // "Compartir con Nitakitos": entender lo que llega desde otra app (Google Maps, una tienda, una lista…).
 
-export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan'
+export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe'
 
 export interface Shared {
   /** Nombre o título principal (sin enlaces). */
@@ -20,6 +20,9 @@ const URL_RE = /https?:\/\/[^\s<>"']+/gi
 const MAPS_RE = /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+)/i
 const SHOP_RE = /(amazon\.|zara\.|etsy\.|aliexpress\.|elcorteingles\.|ikea\.|decathlon\.|fnac\.|pccomponentes\.|shein\.|mango\.|nike\.|adidas\.|wallapop\.|vinted\.|casadellibro\.|sephora\.|primor\.|hm\.com|pullandbear\.|bershka\.|stradivarius\.|massimodutti\.|uniqlo\.|lego\.)/i
 
+// TikTok y YouTube casi siempre son recetas (Instagram puede ser un restaurante: se queda como idea).
+const VIDEO_RE = /(tiktok\.com|youtube\.com|youtu\.be)/i
+
 const clean = (s: string) => s.replace(/^["'«“\s]+|["'»”\s]+$/g, '').trim()
 
 export function parseShared(p: { title?: string | null; text?: string | null; url?: string | null }): Shared {
@@ -38,6 +41,7 @@ export function parseShared(p: { title?: string | null; text?: string | null; ur
 
   let suggested: ShareTarget = 'idea'
   if (link && SHOP_RE.test(link)) suggested = 'gift'
+  else if ((link && VIDEO_RE.test(link)) || /\breceta/i.test(all)) suggested = 'recipe'
   else if (!link && lines.length >= 2 && lines.every((l) => l.length <= 40)) suggested = 'shopping'
   else if (!link && name.length > 60) suggested = 'note'
 

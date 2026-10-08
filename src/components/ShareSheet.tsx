@@ -10,10 +10,12 @@ import { saveIdea } from '../services/ideas'
 import { addShoppingItem } from '../services/shopping'
 import { BottomSheet } from './BottomSheet'
 import { GiftForm, emptyGift, hostOf } from './GiftsView'
+import { RecipeForm, emptyRecipe } from './food/RecipesView'
 
 const TARGETS: { id: ShareTarget; label: string }[] = [
   { id: 'idea', label: '💡 Algún día' },
   { id: 'plan', label: '📅 Plan con fecha' },
+  { id: 'recipe', label: '🍝 Receta' },
   { id: 'gift', label: '🎁 Regalo' },
   { id: 'shopping', label: '🛒 Compra' },
   { id: 'note', label: '📝 Nota' },
@@ -40,6 +42,7 @@ export function ShareSheet({
   const [place, setPlace] = useState<PlaceInfo | null>(null)
   const [finding, setFinding] = useState(shared.isMaps)
   const [gift, setGift] = useState(false)
+  const [recipe, setRecipe] = useState(false)
   const { items } = useShopping()
   const fail = (e: Error) => onToast(e.message)
 
@@ -63,9 +66,21 @@ export function ShareSheet({
   if (gift)
     return <GiftForm draft={emptyGift({ title, url: shared.link })} me={me} partner={partner} onClose={onClose} onError={onToast} onSaved={() => onToast('🎁 Guardado en Planes → Regalos (solo lo ves tú)')} />
 
+  if (recipe)
+    return (
+      <RecipeForm
+        draft={emptyRecipe({ title: /^https?:/.test(title) || /tiktok|youtube|instagram/i.test(title) ? '' : title, url: shared.link })}
+        me={me}
+        onClose={onClose}
+        onError={onToast}
+        onSaved={() => onToast('🍝 Receta guardada en Comida → Recetas')}
+      />
+    )
+
   const save = () => {
     const t = title.trim()
     if (target === 'gift') return setGift(true)
+    if (target === 'recipe') return setRecipe(true)
     if (target === 'plan') {
       onMakePlan({ title: t, place, notes: linkNote })
       return
@@ -84,7 +99,7 @@ export function ShareSheet({
     onClose()
   }
 
-  const canSave = target === 'shopping' ? shopping.length > 0 : title.trim() !== ''
+  const canSave = target === 'shopping' ? shopping.length > 0 : target === 'recipe' || title.trim() !== ''
 
   return (
     <BottomSheet
@@ -93,7 +108,7 @@ export function ShareSheet({
       title="Guardar en Nitakitos"
       footer={
         <button onClick={save} disabled={!canSave} className="h-13 w-full rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
-          {target === 'gift' || target === 'plan' ? 'Seguir' : 'Guardar'}
+          {target === 'gift' || target === 'plan' || target === 'recipe' ? 'Seguir' : 'Guardar'}
         </button>
       }
     >
@@ -156,6 +171,7 @@ export function ShareSheet({
           </p>
         )}
         {shared.link && !shared.isMaps && target !== 'shopping' && <p className="truncate text-xs text-muted">🔗 {shared.link}</p>}
+        {target === 'recipe' && <p className="text-xs text-muted">En el siguiente paso puedes pegar la descripción del vídeo para sacar los ingredientes.</p>}
         {target === 'gift' && <p className="text-xs text-muted">🤫 Solo lo verás tú, en Planes → Regalos.</p>}
       </div>
     </BottomSheet>

@@ -136,6 +136,24 @@ service cloud.firestore {
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120;
     }
 
+    // Menú de la semana (id = fecha_comida|cena) y recetario.
+    match /meals/{mealId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.date is string && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.slot in ['comida', 'cena']
+        && mealId == request.resource.data.date + '_' + request.resource.data.slot
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100;
+    }
+    match /recipes/{recipeId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+        && request.resource.data.ingredients is list && request.resource.data.ingredients.size() <= 100;
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();

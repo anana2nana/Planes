@@ -396,3 +396,21 @@ test('regalos: aviso 3 semanas antes solo a quien regala, sin desvelar las ideas
   assert.equal(giftPushes([], { nita: null, kitos: null }, null, prefs, new Date('2027-01-24T20:00:00')).length, 0)
   assert.equal(giftPushes([{ owner: 'kitos', occasion: 'sanvalentin', status: 'idea' }], { nita: null, kitos: null }, null, prefs, new Date('2027-01-24T20:00:00'))[0].to, 'kitos')
 })
+
+import { mealLine, menuReminder } from './logic.js'
+
+test('menú: línea del resumen y aviso del domingo', () => {
+  const meals = [
+    { slot: 'cena' as const, title: 'Pizza', eat: { nita: 'casa' as const, kitos: 'casa' as const } },
+    { slot: 'comida' as const, title: 'Lentejas', eat: { nita: 'taper' as const, kitos: 'fuera' as const } },
+  ]
+  assert.equal(mealLine(meals, 'nita'), '🍝 Comida: Lentejas (🥡 táper) · Cena: Pizza')
+  assert.equal(mealLine(meals, 'kitos'), '🍝 Cena: Pizza')
+  assert.equal(mealLine([], 'kitos'), null)
+  const prefs = { nita: { ...DEFAULT_PREFS }, kitos: { ...DEFAULT_PREFS, home: false } }
+  const sunday = new Date('2026-10-11T20:00:00')
+  assert.deepEqual(menuReminder(sunday, 0, prefs).map((p) => p.to), ['nita'])
+  assert.match(menuReminder(sunday, 2, prefs)[0].body, /Solo hay 2 comidas/)
+  assert.equal(menuReminder(sunday, 3, prefs).length, 0)
+  assert.equal(menuReminder(new Date('2026-10-10T20:00:00'), 0, prefs).length, 0)
+})

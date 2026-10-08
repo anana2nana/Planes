@@ -19,6 +19,9 @@ import {
   LATE_GRACE_MIN,
   activityPushes,
   digestPush,
+  mealLine,
+  menuReminder,
+  type MealLite,
   normalizePrefs,
   specialDay,
   reminderPushes,
@@ -41,6 +44,8 @@ const KITOS_EMAIL = defineString('KITOS_EMAIL', { description: 'Email de Google 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 function toPlan(snap: DocumentSnapshot): PlanData | null {
   if (!snap.exists) return null
@@ -218,8 +223,11 @@ export const dailyDigest = onSchedule({ schedule: '0 * * * *', timeZone: 'Europe
   const snap = await db.collection('plans').where('done', '==', false).where('dueAt', '<', Timestamp.fromDate(endOfToday)).get()
   const plans = snap.docs.map((d) => toPlan(d)!)
   const since = (await db.doc('config/couple').get()).get('since')
-  const extra = typeof since === 'string' ? specialDay(since, now) : null
+  const special = typeof since === 'string' ? specialDay(since, now) : null
+  const todayKey = ymdOf(now)
+  const meals = (await db.collection('meals').where('date', '==', todayKey).get()).docs.map((d) => d.data() as MealLite)
   for (const person of people) {
+    const extra = [special, mealLine(meals, person)].filter(Boolean).join('\n') || null
     const push = digestPush(person, plans, now.getTime(), extra)
     if (push) await send(push)
   }
@@ -263,7 +271,7 @@ function parseHomeItem(id: string, x: Record<string, any>): HomeItem {
   }
 }
 
-/** Cada tarde a las 20:00: cuidados de la gata, regalos, pagos de mañana y (el día 1) actualizar el ahorro. */
+/** Cada tarde a las 20:00: cuidados de la gata, regalos, menú (domingos), pagos de mañana y (el día 1) actualizar el ahorro. */
 export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Europe/Madrid' }, async () => {
   const [cfgSnap, petSnap, careSnap, prefs] = await Promise.all([db.doc('home/meroe').get(), db.doc('pet/profile').get(), db.collection('petCare').get(), loadPrefs()])
   const care: CareItem[] = careSnap.docs.map((d) => ({
@@ -283,6 +291,15 @@ export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Eur
     .filter((g): g is GiftLite => g.owner === 'nita' || g.owner === 'kitos')
   const birthdays = { nita: md(coupleSnap.get('birthdays')?.nita), kitos: md(coupleSnap.get('birthdays')?.kitos) }
   for (const push of giftPushes(gifts, birthdays, typeof since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(since) ? since : null, prefs, new Date())) await send(push)
+
+  // Domingo: ¿está hecho el menú de la semana que viene?
+  if (new Date().getDay() === 0) {
+    const t = new Date()
+    const mon = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1))
+    const sun = ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 7))
+    const planned = (await db.collection('meals').where('date', '>=', mon).where('date', '<=', sun).get()).size
+    for (const push of menuReminder(t, planned, prefs)) await send(push)
+  }
 
   const cfg = parseHome(cfgSnap.data())
   if (!cfg) return

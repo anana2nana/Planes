@@ -28,6 +28,9 @@ Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (
 - `public/sw.js` — service worker que muestra los push (mensajes solo de datos).
 - `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts`, `home.ts`, `pet.ts` y `gifts.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
 - Funciones programadas: `sendReminders` (cada 5 min), `dailyDigest` (cada hora; manda el resumen a quien lo tenga a esa hora, `digestHour` en `config/notifications`), `homeReminders` (20:00: pagos de MEROE de mañana; el día 1, recordatorio de actualizar el ahorro), `updateEuribor` (8:30).
+- **Pestaña Comida** (antes "Compra"; `food/FoodView`): 🛒 Compra · 🍝 Menú · 📖 Recetas (recuerda el último apartado en localStorage; `rememberFoodMode`).
+- **Menú de la semana** (`food/MenuView`, `lib/menu.ts` testeado): colección `meals` con id `yyyy-mm-dd_comida|cena`; comida todos los días y cena solo el finde (entre semana, "+ cena"). Cada uno come `casa | taper | fuera` (martes y miércoles, táper los dos por defecto: Nita lleva táper esos días y Kitos también), `cook` nita/kitos/both (suele cocinar Nita o juntos). "Hacer de más para otros días" copia el plato. "Ingredientes a la compra" junta los de las recetas que quedan (sin cantidades: `ingredientName`; despensa desmarcada). Hoy para ti y el resumen de la mañana muestran la comida; `homeReminders` el domingo avisa si la semana siguiente tiene < 3 comidas.
+- **Recetas** (`food/RecipesView`, colección `recipes`): enlace (sobre todo TikTok/Instagram de Diego Doal y Cocina con Carmen, que no tienen web con datos: no se puede importar solo), ingredientes y pasos; "Pegar la descripción del vídeo" los separa (`splitRecipeText`). Compartir un TikTok/YouTube sugiere "Receta".
 - **Lista de la compra**: `shopping` (un doc por cosa) + `config/shopping.items` (lo que suelen comprar: veces y sección, para sugerencias). `ShoppingView`.
 - Agenda: franja `TodayStrip` ("Hoy para ti", con "💞 N días juntos" y días especiales). Formulario de planes: "Guardar cambios" solo aparece si hay cambios (`dirty`).
 - **Algún día** (en Planes, interruptor "Con fecha / Algún día"): colección `ideas` (`IdeasView`, `lib/ideas.ts`), ruleta "¿Qué hacemos hoy?"; "Ponerle fecha" abre el formulario relleno y al guardar marca la idea como hecha.
@@ -59,7 +62,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - `assignee`: `nita` | `kitos` | `both`. "Duplicar" = dos documentos con el mismo `groupId`.
 - `repeat`: `{ days[] (0=domingo), yearly, rotate }`. Planes/tareas: al completar se crea el siguiente documento (`spawnedFrom`); con `rotate` (turnos) el siguiente es para la otra persona. Citas: no se completan; la función `sendReminders` las mueve a su siguiente fecha cuando pasan.
 - Citas de todo el día: avisos referidos a las 9:00. `remindWeekBefore`: aviso extra 7 días antes.
-- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona).
+- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `meals`, `recipes`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona).
 
 ## Cómo probar (en este entorno)
 
@@ -81,9 +84,9 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 
 ## Ideas pendientes
 
-Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario, compartir, regalos, reparto, notas.
+Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario, compartir, regalos, reparto, notas, menú y recetas.
 
-- **Fase 2 (acordada con Nita)**: menú semanal sobre todo de **comidas** (cenan poco) con recetas → ingredientes a la compra; **diario de planes** (foto + frase al completar, "tal día como hoy"); **viajes** (fechas, reservas, maleta reutilizable, presupuesto). Descartado: gastos compartidos tipo Splitwise (no hacen cuentas).
+- **Fase 2 (acordada con Nita)**: ~~menú semanal~~ (hecho); **diario de planes** (foto + frase al completar, "tal día como hoy"); **viajes** (fechas, reservas, maleta reutilizable, presupuesto). Descartado: gastos compartidos tipo Splitwise (no hacen cuentas).
 - Navegación: 5 pestañas abajo, no caben más. Si algo necesita pestaña propia, replantear (p. ej. "Más" o juntar Planes y Tareas). Nita prefiere completar funciones y reordenar después.
 
 - MEROE está en la **Comunidad de Madrid**: AJD 0,75 % del precio sin IVA (anunciada rebaja al 0,4 % para menores de 40 desde 2027, pendiente de aprobar; no sabemos sus edades).

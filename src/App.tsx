@@ -19,7 +19,7 @@ import { Avatar } from './components/Avatar'
 import { CalendarIcon, CartIcon, CheckIcon, ChevronIcon, CloudOffIcon, HomeIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
 import { CalendarView } from './components/CalendarView'
 import { AT_HOME_TITLES, HomeView } from './components/home/HomeView'
-import { ShoppingView } from './components/ShoppingView'
+import { FoodView, rememberFoodMode } from './components/food/FoodView'
 import { PlanForm } from './components/PlanForm'
 import { PlansView } from './components/PlansView'
 import { SettingsView } from './components/SettingsView'
@@ -39,7 +39,7 @@ type Sheet = { mode: 'new'; kind?: Kind; date?: string; idea?: Idea; prefill?: P
 
 /** Tipo por defecto al pulsar + en cada pestaña. */
 const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', shopping: 'task', home: 'plan', settings: 'plan' }
-const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', shopping: 'Lista de la compra', home: 'Casa', settings: 'Ajustes' }
+const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', shopping: 'Comida', home: 'Casa', settings: 'Ajustes' }
 
 function greeting() {
   const h = new Date().getHours()
@@ -197,9 +197,13 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onToggle={onToggle}
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
             onGoTasks={() => setTab('tasks')}
+            onGoMenu={() => {
+              rememberFoodMode('menu')
+              setTab('shopping')
+            }}
           />
         ) : tab === 'shopping' ? (
-          <ShoppingView me={me} onToast={setToast} />
+          <FoodView me={me} onToast={setToast} />
         ) : tab === 'home' ? (
           <HomeView me={me} onError={setToast} onTitle={setHomeTitle} />
         ) : (
@@ -225,7 +229,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           <NavButton active={tab === 'agenda'} onClick={() => setTab('agenda')} icon={<CalendarIcon className="size-6" />} label="Agenda" />
           <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
           <NavButton active={tab === 'tasks'} onClick={() => setTab('tasks')} icon={<CheckIcon className="size-6" strokeWidth={2.5} />} label="Tareas" />
-          <NavButton active={tab === 'shopping'} onClick={() => setTab('shopping')} icon={<CartIcon className="size-6" />} label="Compra" />
+          <NavButton active={tab === 'shopping'} onClick={() => setTab('shopping')} icon={<CartIcon className="size-6" />} label="Comida" />
           <NavButton active={tab === 'home'} onClick={() => setTab('home')} icon={<HomeIcon className="size-6" />} label="Casa" />
         </div>
       </nav>
