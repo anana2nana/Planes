@@ -54,6 +54,7 @@ export function usePlans() {
                 place: parsePlace(data.place),
                 seriesId: data.seriesId ?? null,
                 spawnedFrom: data.spawnedFrom ?? null,
+                health: data.health === true,
                 dueAt: data.dueAt ?? null,
                 allDay: data.allDay ?? false,
                 priority: data.priority ?? 'medium',

@@ -50,6 +50,8 @@ export interface Plan {
   createdBy: PersonId
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
+  /** Cita médica creada desde Bienestar → Médico. */
+  health?: boolean
 }
 
 export interface Tag {

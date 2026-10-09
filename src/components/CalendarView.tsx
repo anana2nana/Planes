@@ -9,6 +9,7 @@ import { Avatar } from './Avatar'
 import { ChevronIcon, NavigateIcon, PlusIcon, RepeatIcon } from './Icons'
 import { DirectionsLink } from './DirectionsLink'
 import { PlanCard } from './PlanCard'
+import type { TimelineItem } from '../lib/timeline'
 
 interface Props {
   plans: Plan[]
@@ -19,7 +20,10 @@ interface Props {
   onToggle: (plan: Plan) => void
   /** Crear un plan nuevo en esa fecha (yyyy-mm-dd). */
   onCreate: (date: string) => void
-  /** Ir a la pestaña Tareas (desde el aviso de atrasadas). */
+  /** Lo que tiene fecha en los demás módulos (viajes, papeles, cobros…): se ve aquí sin copiarlo. */
+  extra?: TimelineItem[]
+  /** Ir al módulo de una de esas cosas. */
+  onGo?: (area: TimelineItem['area'], section: string) => void
 }
 
 /** Una entrada del calendario: un plan real o una repetición futura (aún no creada). */
@@ -39,7 +43,7 @@ const sameDay = (a: Date, b: Date) => dayKey(a) === dayKey(b)
 
 const DOT: Record<Plan['assignee'], string> = { nita: 'bg-nita', kitos: 'bg-kitos', both: 'bg-both' }
 
-export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, onCreate }: Props) {
+export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, onCreate, extra = [], onGo }: Props) {
   const now = useNow(60_000)
   const today = new Date(now)
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
@@ -73,6 +77,16 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
     map.forEach((list) => list.sort((a, b) => a.date.getTime() - b.date.getTime()))
     return map
   }, [plans, gridEnd])
+
+  const extraByDay = useMemo(() => {
+    const map = new Map<string, TimelineItem[]>()
+    for (const i of extra) {
+      const k = i.date.replaceAll('-', '')
+      map.set(k, [...(map.get(k) ?? []), i])
+    }
+    return map
+  }, [extra])
+  const extras = extraByDay.get(dayKey(selected)) ?? []
 
   const tagsById = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags])
   const siblingsOf = (p: Plan) => (p.groupId ? plans.filter((s) => s.groupId === p.groupId && s.id !== p.id) : [])
@@ -138,6 +152,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
             const isSel = sameDay(day, selected)
             const isToday = sameDay(day, today)
             const pending = list.filter((e) => !e.plan.done || e.virtual)
+            const more = extraByDay.get(dayKey(day)) ?? []
             return (
               <button
                 key={day.toISOString()}
@@ -145,7 +160,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
                   setSelected(day)
                   if (!inMonth) setMonth(new Date(day.getFullYear(), day.getMonth(), 1))
                 }}
-                aria-label={`${dayFmt.format(day)}${list.length ? `, ${list.length} cosas` : ''}`}
+                aria-label={`${dayFmt.format(day)}${list.length + more.length ? `, ${list.length + more.length} cosas` : ''}`}
                 aria-pressed={isSel}
                 className="flex flex-col items-center gap-1 py-1"
               >
@@ -161,6 +176,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
                     <span key={i} className={`size-1.5 rounded-full ${DOT[e.plan.assignee]} ${e.virtual ? 'opacity-40' : ''} ${inMonth ? '' : 'opacity-30'}`} />
                   ))}
                   {pending.length === 0 && list.length > 0 && <span className="size-1.5 rounded-full bg-stone-300" />}
+                  {more.length > 0 && <span className={`size-1.5 rounded-full bg-amber-400 ${inMonth ? '' : 'opacity-30'}`} />}
                 </span>
               </button>
             )
@@ -176,13 +192,18 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-both opacity-40" /> Se repite
           </span>
+          {extra.length > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-amber-400" /> Viajes, papeles, casa…
+            </span>
+          )}
         </div>
       </section>
 
       <section>
         <div className="mb-2 flex items-baseline justify-between px-1">
           <h2 className="text-sm font-extrabold">{capitalize(dayFmt.format(selected))}</h2>
-          <span className="text-xs text-muted">{entries.length ? `${entries.length} ${entries.length === 1 ? 'cosa' : 'cosas'}` : ''}</span>
+          <span className="text-xs text-muted">{entries.length + extras.length ? `${entries.length + extras.length} ${entries.length + extras.length === 1 ? 'cosa' : 'cosas'}` : ''}</span>
         </div>
 
         <div className="space-y-2.5">
@@ -218,7 +239,20 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
             ),
           )}
 
-          {entries.length === 0 && <p className="px-1 py-2 text-sm text-muted">Nada este día.</p>}
+          {extras.map((i) => (
+            <button key={i.key} onClick={() => onGo?.(i.area, i.section)} className="flex w-full items-center gap-3 rounded-3xl bg-amber-50/70 p-3.5 text-left active:scale-[0.99]">
+              <span className="grid size-7 shrink-0 place-items-center text-lg" aria-hidden>
+                {i.emoji}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold">{i.title}</span>
+                <span className="text-[11px] font-semibold text-amber-800">{i.detail}</span>
+              </span>
+              <ChevronIcon className="size-4 shrink-0 text-muted" />
+            </button>
+          ))}
+
+          {entries.length === 0 && extras.length === 0 && <p className="px-1 py-2 text-sm text-muted">Nada este día.</p>}
 
           <button
             onClick={() => onCreate(dateToDraft(selected, true).dueDate)}

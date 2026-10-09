@@ -8,6 +8,9 @@ import { PEOPLE } from '../../lib/people'
 import type { PersonId } from '../../lib/types'
 import { BottomSheet } from '../BottomSheet'
 import { PlusIcon, TrashIcon } from '../Icons'
+import { isMedical } from '../../lib/medical'
+import { createPlan } from '../../services/plans'
+import type { Plan } from '../../lib/types'
 
 export type HealthKind = 'cita' | 'revision' | 'vacuna' | 'analitica' | 'medicacion' | 'otro'
 export const HEALTH_KINDS: Record<HealthKind, { label: string; emoji: string }> = {
@@ -78,7 +81,7 @@ const input = 'h-11 w-full rounded-xl border border-stone-200 bg-surface px-3 fo
 const card = 'rounded-3xl bg-surface p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]'
 
 /** Salud de cada uno (privada): ficha, próximas citas, medicación e historial. */
-export function HealthView({ me, onError }: { me: PersonId; onError: (m: string) => void }) {
+export function HealthView({ me, onError, plans = [], onOpenPlan }: { me: PersonId; onError: (m: string) => void; plans?: Plan[]; onOpenPlan?: (p: Plan) => void }) {
   const { items, loading } = useHealth(me)
   const [sheet, openSheet, closeSheet] = useSheetState<Partial<HealthItem>>()
   const today = ymdOf(new Date())
@@ -89,20 +92,43 @@ export function HealthView({ me, onError }: { me: PersonId; onError: (m: string)
   const meds = items.filter((h) => h.kind === 'medicacion' && h.active)
   const history = items.filter((h) => h.date && h.date < today && !(h.kind === 'medicacion' && h.active)).sort((a, b) => b.date!.localeCompare(a.date!))
   const partner = me === 'nita' ? 'kitos' : 'nita'
+  // Las citas médicas de la agenda (las tuyas o de los dos) también salen aquí, sin copiarlas.
+  const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime()
+  const agenda = plans.filter((p) => p.kind === 'event' && p.dueAt && (p.assignee === me || p.assignee === 'both') && isMedical(p))
+  const agendaNext = agenda.filter((p) => p.dueAt!.toMillis() >= startOfToday).sort((a, b) => a.dueAt!.toMillis() - b.dueAt!.toMillis())
+  const agendaPast = agenda.filter((p) => p.dueAt!.toMillis() < startOfToday).sort((a, b) => b.dueAt!.toMillis() - a.dueAt!.toMillis())
+  const agendaRow = (p: Plan) => (
+    <li key={`plan-${p.id}`}>
+      <button onClick={() => onOpenPlan?.(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-stone-50">
+        <span className="text-2xl" aria-hidden>
+          📅
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-bold">{p.title}</span>
+          <span className="block truncate text-xs text-muted">
+            {p.dueAt!.toMillis() >= startOfToday ? `${whenText(daysTo(ymdOf(p.dueAt!.toDate()), new Date()))} · ` : ''}
+            {dateFmt.format(p.dueAt!.toDate())}
+            {!p.allDay && ` · ${p.dueAt!.toDate().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`} · en la agenda
+          </span>
+        </span>
+      </button>
+    </li>
+  )
 
   return (
     <div className="space-y-5">
-      <p className="px-1 text-xs font-semibold text-muted">🔒 Solo lo ves tú: ni {PEOPLE[partner].name} puede verlo.</p>
+      <p className="px-1 text-xs font-semibold text-muted">🔒 Lo de aquí solo lo ves tú. Las citas que están en la agenda (📅) también las ve {PEOPLE[partner].name}.</p>
       <ProfileCard me={me} onError={onError} />
 
       <section className="space-y-2">
         <h2 className="px-1 text-xs font-bold uppercase tracking-wider text-muted">Próximo</h2>
         {loading ? (
           <div className="h-20 animate-pulse rounded-3xl bg-surface/70" />
-        ) : upcoming.length === 0 ? (
+        ) : upcoming.length + agendaNext.length === 0 ? (
           <p className="px-1 text-sm text-muted">Nada pendiente. Apunta citas y revisiones (dentista, ginecólogo, oculista…) y te aviso la víspera.</p>
         ) : (
           <ul className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+            {agendaNext.map(agendaRow)}
             {upcoming.map(({ h, d }) => (
               <Row key={h.id} h={h} line={`${whenText(daysTo(d, new Date()))} · ${dateFmt.format(parseYmd(d))}`} onOpen={() => openSheet(h)} />
             ))}
@@ -129,10 +155,11 @@ export function HealthView({ me, onError }: { me: PersonId; onError: (m: string)
         ))}
       </div>
 
-      {history.length > 0 && (
+      {history.length + agendaPast.length > 0 && (
         <section className="space-y-2">
           <h2 className="px-1 text-xs font-bold uppercase tracking-wider text-muted">Historial</h2>
           <ul className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+            {agendaPast.slice(0, 10).map(agendaRow)}
             {history.map((h) => (
               <Row key={h.id} h={h} line={[dateFmt.format(parseYmd(h.date!)), h.doctor].filter(Boolean).join(' · ')} onOpen={() => openSheet(h)} />
             ))}
@@ -221,12 +248,27 @@ function ProfileCard({ me, onError }: { me: PersonId; onError: (m: string) => vo
 function HealthSheet({ item, me, onClose, onError }: { item: Partial<HealthItem>; me: PersonId; onClose: () => void; onError: (m: string) => void }) {
   const [d, setD] = useState({ kind: 'cita' as HealthKind, title: '', date: null as string | null, next: null as string | null, doctor: '', notes: '', active: false, ...item })
   const set = (o: Partial<typeof d>) => setD((x) => ({ ...x, ...o }))
+  const med = d.kind === 'medicacion'
+  // Las citas nuevas pueden ir a la agenda (así no se apuntan dos veces): se ven en el calendario y aquí.
+  const canAgenda = !item.id && !med && d.kind !== 'otro'
+  const [agenda, setAgenda] = useState(!item.id && (item.kind ?? 'cita') === 'cita')
+  const [time, setTime] = useState('')
+  const toAgenda = canAgenda && agenda && !!d.date
   const save = () => {
     if (!d.title.trim()) return
-    saveItem('health', { ...d, owner: me, title: d.title.trim(), doctor: d.doctor.trim(), notes: d.notes.trim() }, me, onError)
+    const title = d.title.trim()
+    if (toAgenda) {
+      createPlan(
+        { kind: 'event', title, notes: [d.doctor.trim(), d.notes.trim()].filter(Boolean).join('\n'), mode: me, dueDate: d.date!, dueTime: time, priority: 'medium', tagIds: [], repeatDays: [], repeatYearly: false, rotate: false, remindWeekBefore: false, place: null },
+        me,
+        { health: true },
+      ).catch((e: Error) => onError(e.message))
+      // La próxima revisión (si la hay) se queda aquí, en privado.
+      if (d.next) saveItem('health', { ...d, date: null, owner: me, title, doctor: d.doctor.trim(), notes: d.notes.trim() }, me, onError)
+      onError('📅 Cita guardada en la agenda (y la ves también en Médico)')
+    } else saveItem('health', { ...d, owner: me, title, doctor: d.doctor.trim(), notes: d.notes.trim() }, me, onError)
     onClose()
   }
-  const med = d.kind === 'medicacion'
   return (
     <BottomSheet
       open
@@ -259,6 +301,19 @@ function HealthSheet({ item, me, onClose, onError }: { item: Partial<HealthItem>
             </label>
           )}
         </div>
+        {canAgenda && (
+          <div className="space-y-2 rounded-2xl bg-sky-50 p-3">
+            <label className="flex items-center justify-between gap-3 text-sm font-semibold text-sky-800">
+              <span>
+                📅 Ponerla en la agenda
+                <span className="block text-xs font-medium opacity-80">Saldrá en el calendario con sus avisos (la verá también tu pareja)</span>
+              </span>
+              <input type="checkbox" checked={agenda} onChange={(e) => setAgenda(e.target.checked)} aria-label="Ponerla en la agenda" className="size-5 accent-both" />
+            </label>
+            {agenda && <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Hora" className={input} />}
+            {agenda && !d.date && <p className="text-xs font-semibold text-sky-800">Elige la fecha arriba.</p>}
+          </div>
+        )}
         {!med && <input value={d.doctor} onChange={(e) => set({ doctor: e.target.value })} placeholder="Médico o centro" aria-label="Médico o centro" maxLength={80} className={input} />}
         <textarea value={d.notes} onChange={(e) => set({ notes: e.target.value })} rows={3} placeholder={med ? 'Dosis: 1 cada 8 h…' : 'Qué te dijeron, resultados, qué preguntar la próxima vez…'} aria-label="Notas" className="w-full resize-none rounded-xl border border-stone-200 bg-surface px-3 py-2 outline-none focus:border-both" />
         {med && (

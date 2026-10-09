@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { Kind, Plan, PersonId, PriorityConfig, Tag } from '../../lib/types'
 import { CalendarView } from '../CalendarView'
 import { PlansView } from '../PlansView'
+import { useTimeline } from '../../hooks/useTimeline'
+import type { TimelineItem } from '../../lib/timeline'
 
 export type AgendaMode = 'calendario' | 'planes' | 'tareas'
 const KEY = 'nitakitos.agenda.mode'
@@ -35,6 +37,7 @@ export function AgendaView({
   onToggle,
   onCreate,
   onMode,
+  onGo,
 }: {
   plans: Plan[]
   me: PersonId
@@ -45,7 +48,9 @@ export function AgendaView({
   onToggle: (p: Plan) => void
   onCreate: (date: string) => void
   onMode: (m: AgendaMode) => void
+  onGo: (area: TimelineItem['area'], section: string) => void
 }) {
+  const extra = useTimeline(me)
   const [mode, setModeState] = useState<AgendaMode>(read)
   useEffect(() => onMode(mode), [mode, onMode])
   const setMode = (m: AgendaMode) => {
@@ -68,7 +73,7 @@ export function AgendaView({
         ))}
       </div>
       {mode === 'calendario' ? (
-        <CalendarView plans={plans} me={me} tags={tags} priorities={priorities} onOpen={onOpen} onToggle={onToggle} onCreate={onCreate} />
+        <CalendarView plans={plans} me={me} tags={tags} priorities={priorities} onOpen={onOpen} onToggle={onToggle} onCreate={onCreate} extra={extra} onGo={onGo} />
       ) : (
         <PlansView kind={mode === 'planes' ? 'plan' : 'task'} plans={plans} me={me} tags={tags} priorities={priorities} loading={loading} onOpen={onOpen} onToggle={onToggle} />
       )}

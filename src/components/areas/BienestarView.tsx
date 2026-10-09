@@ -10,6 +10,8 @@ import { NutritionView } from '../food/NutritionView'
 import { BodyView } from '../fitness/BodyView'
 import { TrainingView } from '../fitness/TrainingView'
 import { HealthView, upcomingDate, useHealth } from '../health/HealthView'
+import { isMedical } from '../../lib/medical'
+import type { Plan } from '../../lib/types'
 import { useBodyLogs, useRoutines, useWorkouts } from '../../hooks/useFitness'
 import { routineForToday, streak, weightTrend } from '../../lib/fitness'
 import { RecipesView } from '../food/RecipesView'
@@ -20,7 +22,7 @@ export type BienestarSection = 'menu' | 'recetas' | 'nutricion' | 'entrenos' | '
 const TITLE: Record<BienestarSection, string> = { menu: 'Menú de la semana', recetas: 'Recetas', nutricion: 'Nutrición', entrenos: 'Entrenos', peso: 'Peso y medidas', medico: 'Médico' }
 
 /** Bienestar: lo que coméis (menú y recetas) y, pronto, entrenos, peso y nutrición. */
-export function BienestarView({ me, onError, onTitle }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void }) {
+export function BienestarView({ me, onError, onTitle, plans = [], onOpenPlan }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void; plans?: Plan[]; onOpenPlan?: (p: Plan) => void }) {
   const [section, open] = useSection<BienestarSection>('bienestar')
   useEffect(() => {
     onTitle(section ? { title: TITLE[section], crumb: 'Bienestar' } : null)
@@ -31,11 +33,11 @@ export function BienestarView({ me, onError, onTitle }: { me: PersonId; onError:
   if (section === 'nutricion') return <NutritionView me={me} onError={onError} />
   if (section === 'entrenos') return <TrainingView me={me} onError={onError} />
   if (section === 'peso') return <BodyView me={me} onError={onError} />
-  if (section === 'medico') return <HealthView me={me} onError={onError} />
-  return <BienestarHub me={me} onOpen={open} />
+  if (section === 'medico') return <HealthView me={me} onError={onError} plans={plans} onOpenPlan={onOpenPlan} />
+  return <BienestarHub me={me} onOpen={open} plans={plans} />
 }
 
-function BienestarHub({ me, onOpen }: { me: PersonId; onOpen: (s: BienestarSection) => void }) {
+function BienestarHub({ me, onOpen, plans }: { me: PersonId; onOpen: (s: BienestarSection) => void; plans: Plan[] }) {
   const days = weekDays(weekStart(new Date()))
   const today = ymd(new Date())
   const { meals } = useMeals(days[0], days[6])
@@ -56,6 +58,12 @@ function BienestarHub({ me, onOpen }: { me: PersonId; onOpen: (s: BienestarSecti
   const nextHealth = health
     .map((h) => ({ h, d: upcomingDate(h, today) }))
     .filter((x): x is { h: (typeof health)[number]; d: string } => x.d !== null)
+    .concat(
+      plans
+        .filter((p) => p.kind === 'event' && p.dueAt && (p.assignee === me || p.assignee === 'both') && isMedical(p))
+        .map((p) => ({ h: { title: p.title } as (typeof health)[number], d: ymd(p.dueAt!.toDate()) }))
+        .filter((x) => x.d >= today),
+    )
     .sort((a, b) => a.d.localeCompare(b.d))[0]
 
   return (
@@ -125,7 +133,7 @@ function BienestarHub({ me, onOpen }: { me: PersonId; onOpen: (s: BienestarSecti
               'Lo tuyo, con su gráfica (solo lo ves tú)'
             )}
           </Tile>
-          <Tile emoji="🩺" title="Médico" onClick={() => onOpen('medico')} wide muted={health.length === 0}>
+          <Tile emoji="🩺" title="Médico" onClick={() => onOpen('medico')} wide muted={!nextHealth && health.length === 0}>
             {nextHealth ? (
               <>
                 Próximo: <b className="text-ink">{nextHealth.h.title}</b> el {new Date(nextHealth.d + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} · 🔒 solo tú

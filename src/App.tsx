@@ -231,11 +231,12 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onToggle={onToggle}
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
             onMode={setAgendaMode}
+            onGo={go}
           />
         ) : tab === 'hogar' ? (
           <HogarView me={me} onError={setToast} onTitle={setAreaTitle} />
         ) : tab === 'bienestar' ? (
-          <BienestarView me={me} onError={setToast} onTitle={setAreaTitle} />
+          <BienestarView me={me} onError={setToast} onTitle={setAreaTitle} plans={plans} onOpenPlan={(p) => openSheet({ mode: 'edit', id: p.id })} />
         ) : tab === 'nosotros' ? (
           <NosotrosView me={me} onError={setToast} onTitle={setAreaTitle} onMakePlan={(idea) => openSheet({ mode: 'new', kind: 'plan', idea })} onPlan={(prefill) => openSheet({ mode: 'new', kind: 'plan', prefill })} />
         ) : (

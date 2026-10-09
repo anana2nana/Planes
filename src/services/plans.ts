@@ -49,7 +49,7 @@ function sharedFields(draft: PlanDraft, seriesId: string | null) {
  * enlazados por `groupId`: comparten título, fecha, prioridad y etiquetas,
  * pero cada uno se completa de forma independiente.
  */
-export async function createPlan(draft: PlanDraft, me: PersonId) {
+export async function createPlan(draft: PlanDraft, me: PersonId, extra: Record<string, unknown> = {}) {
   const batch = writeBatch(db)
   const base = {
     ...sharedFields(draft, null),
@@ -60,6 +60,7 @@ export async function createPlan(draft: PlanDraft, me: PersonId) {
     createdBy: me,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    ...extra,
   }
 
   if (draft.mode === 'duplicate') {
