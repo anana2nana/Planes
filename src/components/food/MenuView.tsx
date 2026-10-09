@@ -3,12 +3,14 @@ import { deleteMeal, saveMeal, useMeals, useRecipes } from '../../hooks/useMenu'
 import { useSheetState } from '../../hooks/useSheetState'
 import { useShopping } from '../../hooks/useShopping'
 import { EAT, defaultEat, defaultSlots, mealId, parseYmd, portions, sourceOf, weekDays, weekIngredients, weekStart, ymd, type EatMode, type Meal, type MealSlot, type Recipe } from '../../lib/menu'
+import { COLORS, dishNutrition, estimateRecipe, weekBalance, type DishColor, type DishNutrition } from '../../lib/nutrition'
 import { PEOPLE } from '../../lib/people'
 import { itemKey } from '../../lib/shopping'
 import type { PersonId } from '../../lib/types'
 import { addShoppingItem } from '../../services/shopping'
 import { BottomSheet } from '../BottomSheet'
 import { ChevronIcon, PlusIcon, TrashIcon } from '../Icons'
+import { ColorBadge, ColorChoice, ColorDot, WeekBar } from './Nutrition'
 import { RecipeCook } from './RecipeCook'
 import { RecipeEditor, emptyRecipe } from './RecipeEditor'
 import { toRecipeDraft } from './RecipesView'
@@ -24,7 +26,7 @@ const COOK: { v: PersonId | 'both'; label: string }[] = [
 ]
 
 type Draft = Omit<Meal, 'id'>
-const emptyMeal = (date: string, slot: MealSlot): Draft => ({ date, slot, title: '', recipeId: null, cook: 'nita', eat: defaultEat(date, slot), notes: '' })
+const emptyMeal = (date: string, slot: MealSlot): Draft => ({ date, slot, title: '', recipeId: null, cook: 'nita', eat: defaultEat(date, slot), notes: '', color: null })
 
 export function MenuView({ me, onToast }: { me: PersonId; onToast: (m: string) => void }) {
   const [offset, setOffset] = useState(0)
@@ -40,6 +42,8 @@ export function MenuView({ me, onToast }: { me: PersonId; onToast: (m: string) =
   const byId = new Map(meals.map((m) => [m.id, m]))
   const recipeById = new Map(recipes.map((r) => [r.id, r]))
   const withRecipe = meals.filter((m) => m.recipeId && recipeById.has(m.recipeId))
+  const nutOf = (m: Meal) => dishNutrition(m, m.recipeId ? recipeById.get(m.recipeId) : null)
+  const balance = weekBalance(meals.filter((m) => portions(m.eat) > 0).map((m) => nutOf(m).color))
 
   return (
     <div className="space-y-4">
@@ -64,6 +68,13 @@ export function MenuView({ me, onToast }: { me: PersonId; onToast: (m: string) =
           <ChevronIcon className="size-4" />
         </button>
       </div>
+
+      {!loading && meals.length > 0 && (
+        <div className={`rounded-3xl p-3.5 ${balance.verdict === 'heavy' ? 'bg-rose-50' : balance.verdict === 'light' ? 'bg-emerald-50' : 'bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]'}`}>
+          <p className="mb-2 text-sm font-bold">{balance.text}</p>
+          <WeekBar balance={balance} />
+        </div>
+      )}
 
       {loading ? (
         <div className="h-60 animate-pulse rounded-3xl bg-surface/70" />
@@ -91,7 +102,7 @@ export function MenuView({ me, onToast }: { me: PersonId; onToast: (m: string) =
                   {slots.map((slot) => {
                     const m = byId.get(mealId(date, slot))
                     return m ? (
-                      <MealRow key={slot} meal={m} recipe={m.recipeId ? recipeById.get(m.recipeId) : undefined} onOpen={() => openSheet({ type: 'meal', draft: toDraft(m), existing: true })} />
+                      <MealRow key={slot} meal={m} recipe={m.recipeId ? recipeById.get(m.recipeId) : undefined} nutrition={nutOf(m)} onOpen={() => openSheet({ type: 'meal', draft: toDraft(m), existing: true })} />
                     ) : (
                       <button
                         key={slot}
@@ -117,7 +128,7 @@ export function MenuView({ me, onToast }: { me: PersonId; onToast: (m: string) =
         🛒 Ingredientes a la compra
       </button>
 
-      {sheet?.type === 'meal' && <MealSheet draft={sheet.draft} existing={sheet.existing} days={days} meals={byId} recipes={recipes} me={me} onClose={closeSheet} onToast={onToast} />}
+      {sheet?.type === 'meal' && <MealSheet draft={sheet.draft} existing={sheet.existing} days={days} meals={byId} recipes={recipes} heavy={balance.verdict === 'heavy'} me={me} onClose={closeSheet} onToast={onToast} />}
       {sheet?.type === 'shop' && <IngredientsSheet meals={withRecipe} recipes={recipes} me={me} onClose={closeSheet} onToast={onToast} />}
     </div>
   )
@@ -133,12 +144,13 @@ function eatSummary(eat: Record<PersonId, EatMode>): string {
     .join(' · ')
 }
 
-function MealRow({ meal, recipe, onOpen }: { meal: Meal; recipe?: Recipe; onOpen: () => void }) {
-  const summary = eatSummary(meal.eat)
+function MealRow({ meal, recipe, nutrition, onOpen }: { meal: Meal; recipe?: Recipe; nutrition: DishNutrition; onOpen: () => void }) {
+  const summary = [eatSummary(meal.eat), nutrition.kcal ? `~${nutrition.kcal} kcal` : ''].filter(Boolean).join(' · ')
   return (
     <button onClick={onOpen} className="flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left active:bg-stone-50">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-stone-100 text-xl" aria-hidden>
-        {recipe?.emoji ?? '🍽️'}
+      <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-stone-100 text-xl">
+        <span aria-hidden>{recipe?.emoji ?? '🍽️'}</span>
+        {nutrition.color && <ColorDot color={nutrition.color} className="absolute -right-0.5 -top-0.5 size-3 ring-2 ring-surface" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] font-bold uppercase tracking-wide text-muted">{SLOT_LABEL[meal.slot]}</span>
@@ -156,6 +168,7 @@ function MealSheet({
   days,
   meals,
   recipes,
+  heavy,
   me,
   onClose,
   onToast,
@@ -165,6 +178,8 @@ function MealSheet({
   days: string[]
   meals: Map<string, Meal>
   recipes: Recipe[]
+  /** La semana va contundente: las ideas ligeras primero. */
+  heavy: boolean
   me: PersonId
   onClose: () => void
   onToast: (m: string) => void
@@ -179,7 +194,10 @@ function MealSheet({
   const q = d.title.trim().toLowerCase()
   const matches = q && !recipe ? recipes.filter((r) => r.title.toLowerCase().includes(q)).slice(0, 5) : []
   // Sin escribir nada: primero las que hace más tiempo que no ponéis.
-  const ideas = !q ? [...recipes].sort((a, b) => (a.lastPlanned ?? '').localeCompare(b.lastPlanned ?? '')).slice(0, 8) : []
+  const colorOf = (r: Recipe): DishColor | null => r.nutrition.color ?? estimateRecipe(r).color
+  const rank = (r: Recipe) => (heavy ? ({ green: 0, yellow: 1, red: 2 } as const)[colorOf(r) ?? 'yellow'] : 0)
+  const ideas = !q ? [...recipes].sort((a, b) => rank(a) - rank(b) || (a.lastPlanned ?? '').localeCompare(b.lastPlanned ?? '')).slice(0, 8) : []
+  const nutrition = dishNutrition(d, recipe ?? null)
   const fail = (e: Error) => onToast(e.message)
 
   const pick = (r: Recipe) => setD({ ...d, title: r.title, recipeId: r.id })
@@ -248,11 +266,16 @@ function MealSheet({
           ) : (
             (matches.length > 0 || ideas.length > 0) && (
               <div className="mt-2">
-                {ideas.length > 0 && <p className="mb-1 text-xs font-semibold text-muted">Del recetario (primero lo que hace más que no coméis):</p>}
+                {ideas.length > 0 && (
+                  <p className="mb-1 text-xs font-semibold text-muted">
+                    {heavy ? 'La semana va contundente: primero las ligeras 🥗' : 'Del recetario (primero lo que hace más que no coméis):'}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-1.5">
                   {(matches.length ? matches : ideas).map((r) => (
                     <button key={r.id} type="button" onClick={() => pick(r)} className="rounded-full bg-violet-50 px-3 py-1.5 text-sm font-semibold text-violet-700 active:scale-95">
                       {r.emoji} {r.title}
+                      {colorOf(r) && <ColorDot color={colorOf(r)} className="ml-1.5 size-2 align-middle" />}
                     </button>
                   ))}
                 </div>
@@ -265,6 +288,26 @@ function MealSheet({
             </button>
           )}
         </div>
+
+        {d.title.trim() && (
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-muted">Cómo es el plato</span>
+            {recipe && !d.color ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {nutrition.color || nutrition.kcal ? <ColorBadge color={nutrition.color} kcal={nutrition.kcal} /> : <span className="text-sm text-muted">Sin datos suficientes</span>}
+                <span className="text-xs text-muted">{nutrition.manual ? 'puesto a mano' : 'calculado'}</span>
+                <button type="button" onClick={() => setEditRecipe(true)} className="text-xs font-bold text-both">
+                  Corregir en la receta
+                </button>
+              </div>
+            ) : (
+              <>
+                <ColorChoice value={d.color} onChange={(color) => setD({ ...d, color })} />
+                {!d.color && nutrition.color && <p className="mt-1 text-xs text-muted">Por el nombre parece {COLORS[nutrition.color].label.toLowerCase()}: tócalo si es así.</p>}
+              </>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <span className="block text-xs font-semibold text-muted">Quién come y dónde</span>

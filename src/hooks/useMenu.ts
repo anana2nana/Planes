@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { collection, deleteDoc, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { EAT, defaultEat, mealId, type EatMode, type Meal, type MealSlot, type Recipe } from '../lib/menu'
+import type { DishColor } from '../lib/nutrition'
 import { flatIngredients, flatSteps } from '../lib/recipe'
 import type { PersonId } from '../lib/types'
+
+const isColor = (v: unknown): v is DishColor => v === 'green' || v === 'yellow' || v === 'red'
 
 const meals = collection(db, 'meals')
 const recipes = collection(db, 'recipes')
@@ -26,6 +29,7 @@ function toMeal(id: string, x: Record<string, any>): Meal {
     cook: x.cook === 'nita' || x.cook === 'kitos' ? x.cook : 'both',
     eat: eatOf(x.eat, x.date, slot),
     notes: x.notes ?? '',
+    color: isColor(x.color) ? x.color : null,
   }
 }
 
@@ -97,6 +101,7 @@ function parseRecipe(id: string, x: Record<string, any>): Recipe {
     tips: arr(x.tips, (t) => ({ title: str(t?.title), text: str(t?.text), kind: t?.kind === 'warn' ? ('warn' as const) : ('good' as const) })),
     credit: str(x.credit),
     hasHtml: x.hasHtml === true,
+    nutrition: { color: isColor(x.nutrition?.color) ? x.nutrition.color : null, kcal: typeof x.nutrition?.kcal === 'number' ? x.nutrition.kcal : null },
     lastPlanned: typeof x.lastPlanned === 'string' ? x.lastPlanned : null,
     createdAt: x.createdAt?.toMillis?.() ?? 0,
   }

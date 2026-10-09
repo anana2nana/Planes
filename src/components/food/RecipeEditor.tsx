@@ -1,11 +1,13 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { deleteRecipe, saveRecipe, type RecipeDraft } from '../../hooks/useMenu'
 import { useLayer } from '../../hooks/useLayer'
 import { splitRecipeText, sourceOf } from '../../lib/menu'
+import { estimateRecipe } from '../../lib/nutrition'
 import { emptyStep, splitQty, type Phase, type Step, type Tip } from '../../lib/recipe'
 import type { PersonId } from '../../lib/types'
 import { BottomSheet } from '../BottomSheet'
 import { ChevronIcon, PlusIcon, TrashIcon } from '../Icons'
+import { NutritionPanel } from './Nutrition'
 
 const EMOJIS = ['🍲', '🥘', '🍝', '🍛', '🥗', '🍗', '🐟', '🥩', '🍳', '🌮', '🍕', '🥪', '🍜', '🫘', '🥔', '🍰']
 const input = 'h-11 w-full rounded-xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both'
@@ -27,6 +29,7 @@ export const emptyRecipe = (o: Partial<RecipeDraft> = {}): RecipeDraft => ({
   phases: [],
   tips: [],
   credit: '',
+  nutrition: { color: null, kcal: null },
   ...o,
 })
 
@@ -87,6 +90,10 @@ export function RecipeEditor({
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }))
   const setPhase = (i: number, p: Phase) => set('phases', d.phases.map((x, j) => (j === i ? p : x)))
   const setGroup = (i: number, g: GroupDraft) => set('groups', d.groups.map((x, j) => (j === i ? g : x)))
+  const estimate = useMemo(
+    () => estimateRecipe({ title: d.title, servings: d.servings, groups: d.groups.map((g) => ({ items: lines(g.text).map(splitQty) })), steps: d.phases.flatMap((p) => p.steps.map((s) => s.text)).join('\n') }),
+    [d.title, d.servings, d.groups, d.phases],
+  )
 
   const save = () => {
     if (!canSave) return
@@ -233,6 +240,10 @@ export function RecipeEditor({
             </Box>
           ))}
           <AddButton onClick={() => set('groups', [...d.groups, { name: '', note: '', text: '' }])}>Grupo de ingredientes</AddButton>
+        </Section>
+
+        <Section title="Nutrición aproximada" hint="Lo calculo con los ingredientes; corrígelo si no te cuadra">
+          <NutritionPanel estimate={estimate} value={d.nutrition} onChange={(v) => set('nutrition', v)} />
         </Section>
 
         <Section title="Antes de empezar" hint="Utensilios, uno por línea (opcional)">

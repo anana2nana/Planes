@@ -7,6 +7,8 @@ import { clock, scaleQty, shoppingName, type Step } from '../../lib/recipe'
 import type { PersonId } from '../../lib/types'
 import { addShoppingItem } from '../../services/shopping'
 import { ChevronIcon, CloseIcon } from '../Icons'
+import { dishNutrition } from '../../lib/nutrition'
+import { ColorBadge } from './Nutrition'
 
 /** Colores de las fases (mismo orden siempre). */
 const PHASE_COLORS = ['#e6a93a', '#b5402e', '#25282e', '#d9848a', '#3c7a5c', '#6e7f55', '#4a3aa7']
@@ -106,6 +108,15 @@ export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: R
           </div>
           <h1 className="mt-2 text-3xl font-extrabold leading-tight tracking-tight">{r.title}</h1>
           {r.description && <p className="mt-2 text-muted">{r.description}</p>}
+          {(() => {
+            const n = dishNutrition({ color: null, title: recipe.title }, recipe)
+            return n.color || n.kcal ? (
+              <div className="mt-3">
+                <ColorBadge color={n.color} kcal={n.kcal} />
+                {n.kcal && <span className="ml-1.5 text-xs text-muted">por ración</span>}
+              </div>
+            ) : null
+          })()}
           {r.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {r.tags.map((t) => (

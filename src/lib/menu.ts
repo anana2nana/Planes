@@ -1,6 +1,7 @@
 // Menú de la semana y recetas: cálculos puros (testeados en tests/menu.test.ts).
 
 import { richFromSimple, shoppingNames, type RichRecipe } from './recipe.ts'
+import type { DishColor, NutritionOverride } from './nutrition.ts'
 import type { PersonId } from './types'
 
 export type MealSlot = 'comida' | 'cena'
@@ -17,6 +18,8 @@ export interface Meal {
   cook: PersonId | 'both'
   eat: Record<PersonId, EatMode>
   notes: string
+  /** Color puesto a mano (platos sin receta, o para corregir el calculado). */
+  color: DishColor | null
 }
 
 export interface Recipe extends Omit<RichRecipe, 'title' | 'url' | 'servings' | 'notes'> {
@@ -31,6 +34,8 @@ export interface Recipe extends Omit<RichRecipe, 'title' | 'url' | 'servings' | 
   notes: string
   /** Tiene el HTML original guardado (en recipeHtml/{id}). */
   hasHtml: boolean
+  /** Correcciones a mano del color y las calorías calculadas. */
+  nutrition: NutritionOverride
   /** Última vez que se puso en el menú (yyyy-mm-dd). */
   lastPlanned: string | null
   createdAt: number
