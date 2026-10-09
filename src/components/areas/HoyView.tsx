@@ -1,4 +1,6 @@
 import { useCouple } from '../../hooks/useCouple'
+import { useRoutines, useWorkouts } from '../../hooks/useFitness'
+import { GROUPS, routineForToday, routineGroups, ymd } from '../../lib/fitness'
 import { useHome } from '../../hooks/useHome'
 import { usePet } from '../../hooks/usePet'
 import { useShopping } from '../../hooks/useShopping'
@@ -43,8 +45,12 @@ export function HoyView({ plans, me, onOpen, onToast, go }: { plans: Plan[]; me:
   const partner: PersonId = me === 'nita' ? 'kitos' : 'nita'
   const occasion = upcomingOccasions(birthdays[partner], since, now).find((o) => o.days <= 30 && o.id !== 'sanvalentin')
   const anniv = since ? nextAnniversary(since, now) : null
+  const { routines } = useRoutines()
+  const { workouts } = useWorkouts()
+  const gym = routineForToday(routines, workouts, me, ymd(now))
 
   const cards = [
+    gym && { key: 'gym', emoji: GROUPS[routineGroups(gym)[0] ?? 'otro'].emoji, title: 'Hoy toca', text: gym.name, on: () => go('bienestar', 'entrenos') },
     pending.length > 0 && { key: 'compra', emoji: '🛒', title: 'Compra', text: `${pending.length} ${pending.length === 1 ? 'cosa' : 'cosas'}: ${pending.slice(0, 3).map((i) => i.name).join(', ')}`, on: () => go('hogar', 'compra') },
     pay && payDays !== null && payDays <= 31 && { key: 'meroe', emoji: '🏗️', title: 'MEROE', text: `${eur(pay.amount)} ${payDays === 0 ? 'hoy' : payDays === 1 ? 'mañana' : `en ${payDays} días`}`, on: () => go('hogar', 'meroe') },
     petNext && petNext.days <= 3 && { key: 'gata', emoji: '🐱', title: profile?.name || 'La gata', text: petNext.days < 0 ? `${petNext.c.title}: atrasado` : petNext.days === 0 ? `Hoy: ${petNext.c.title}` : `${petNext.c.title} ${petNext.days === 1 ? 'mañana' : `en ${petNext.days} días`}`, on: () => go('hogar', 'gata') },

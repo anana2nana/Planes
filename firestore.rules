@@ -187,6 +187,35 @@ service cloud.firestore {
       allow read, write: if isCouple() && person == me();
     }
 
+    // Salud: rutinas y entrenos (los ven los dos; cada uno toca los suyos).
+    match /routines/{routineId} {
+      allow read: if isCouple();
+      allow delete: if isCouple() && resource.data.owner == me();
+      allow create, update: if isCouple()
+        && request.resource.data.owner == me()
+        && (resource == null || resource.data.owner == me())
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.exercises is list && request.resource.data.exercises.size() <= 40;
+    }
+    match /workouts/{workoutId} {
+      allow read: if isCouple();
+      allow delete: if isCouple() && resource.data.owner == me();
+      allow create, update: if isCouple()
+        && request.resource.data.owner == me()
+        && (resource == null || resource.data.owner == me())
+        && request.resource.data.date is string && request.resource.data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.entries is list && request.resource.data.entries.size() <= 40;
+    }
+    // ⚖️ Peso y medidas: cada uno solo ve los suyos.
+    match /bodyLogs/{logId} {
+      allow read, delete: if isCouple() && resource.data.owner == me();
+      allow create, update: if isCouple()
+        && request.resource.data.owner == me()
+        && (resource == null || resource.data.owner == me())
+        && request.resource.data.date is string;
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();
