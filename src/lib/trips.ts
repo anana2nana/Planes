@@ -1,5 +1,6 @@
 // Viajes: fechas, reservas, maleta y presupuesto. Puro y testeado (tests/trips.test.ts).
 
+import { distanceKm } from './spots.ts'
 import type { AssignMode, PlaceInfo } from './types'
 
 export type BookingKind = 'vuelo' | 'tren' | 'bus' | 'hotel' | 'coche' | 'actividad' | 'seguro' | 'otro'
@@ -132,4 +133,44 @@ export function tripDates(t: Pick<Trip, 'start' | 'end'>): string {
   if (!t.end || t.end === t.start) return fmt(a)
   const b = parse(t.end)
   return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear() ? `Del ${fmt(a, false)} al ${fmt(b)}` : `${fmt(a)} – ${fmt(b)}`
+}
+
+// ─── Conexiones con otros módulos ───────────────────────────────────────────
+
+export interface DocWarning {
+  title: string
+  owner: string
+  expires: string
+  level: 'red' | 'amber'
+  text: string
+}
+
+/**
+ * DNI y pasaportes que caducan antes de volver (rojo) o menos de 6 meses después
+ * (ámbar: muchos países fuera de la UE lo piden).
+ */
+export function docWarnings(t: Pick<Trip, 'start' | 'end'>, papers: { title: string; kind: string; owner: string; expires: string | null }[]): DocWarning[] {
+  if (!t.start) return []
+  const back = t.end ?? t.start
+  const [y, m, d] = back.split('-').map(Number)
+  const sixMonths = ymd(new Date(y, m - 1 + 6, d))
+  const out: DocWarning[] = []
+  for (const p of papers) {
+    if (p.kind !== 'documento' || !p.expires || !/pasaporte|dni/i.test(p.title)) continue
+    const passport = /pasaporte/i.test(p.title)
+    if (p.expires < back) out.push({ title: p.title, owner: p.owner, expires: p.expires, level: 'red', text: p.expires < t.start ? 'caduca antes de salir' : 'caduca antes de volver' })
+    else if (passport && p.expires < sixMonths) out.push({ title: p.title, owner: p.owner, expires: p.expires, level: 'amber', text: 'caduca menos de 6 meses después de volver (algunos países lo piden)' })
+  }
+  return out
+}
+
+/** Recuerdos del diario de los días del viaje. */
+export const memoriesDuring = <T extends { date: string }>(t: Pick<Trip, 'start' | 'end'>, memories: T[]): T[] =>
+  t.start ? memories.filter((m) => m.date >= t.start! && m.date <= (t.end ?? t.start!)).sort((a, b) => a.date.localeCompare(b.date)) : []
+
+/** Sitios guardados cerca del destino (por defecto, a menos de 60 km). */
+export function spotsNear<T extends { place: { lat: number | null; lng: number | null } | null }>(t: Pick<Trip, 'destination'>, spots: T[], km = 60): T[] {
+  const d = t.destination
+  if (d?.lat == null || d?.lng == null) return []
+  return spots.filter((s) => s.place?.lat != null && s.place?.lng != null && distanceKm({ lat: d.lat!, lng: d.lng! }, { lat: s.place.lat, lng: s.place.lng }) <= km)
 }

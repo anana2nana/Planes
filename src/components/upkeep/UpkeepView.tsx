@@ -233,3 +233,48 @@ function CarForm({ car, onSave }: { car: { model: string; plate: string; km: str
     </form>
   )
 }
+
+/**
+ * En Agenda → Tareas: lo del mantenimiento (casa y coche) y de la gata que toca en los próximos días,
+ * para hacerlo sin apuntarlo dos veces.
+ */
+export function DueChores({ me, onError, petName, petCare, onPetDone }: { me: PersonId; onError: (m: string) => void; petName: string; petCare: CareItem[]; onPetDone: (c: CareItem, date: string) => void }) {
+  const { items } = useUpkeep()
+  const today = new Date()
+  const t = ymd(today)
+  const due = [
+    ...items.filter((u) => u.last).map((u) => ({ key: `u-${u.id}`, emoji: u.area === 'casa' ? '🧰' : '🚗', title: u.title, days: daysUntil(nextDue(u, today), today), done: () => saveItem('upkeep', { ...u, last: t, lastBy: me, history: u.history.includes(t) ? u.history : [...u.history, t] }, me, onError) })),
+    ...petCare.filter((c) => c.last).map((c) => ({ key: `p-${c.id}`, emoji: '🐱', title: `${c.title}${petName ? ` (${petName})` : ''}`, days: daysUntil(nextDue(c, today), today), done: () => onPetDone(c, t) })),
+  ]
+    .filter((x) => x.days <= 3)
+    .sort((a, b) => a.days - b.days)
+  if (!due.length) return null
+  return (
+    <section className="space-y-2">
+      <h2 className="px-1 text-xs font-bold uppercase tracking-wider text-muted">Toca en casa</h2>
+      <ul className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+        {due.map((x) => (
+          <li key={x.key} className="flex items-center gap-3 px-4 py-3">
+            <span className="text-xl" aria-hidden>
+              {x.emoji}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{x.title}</span>
+              <span className={`block text-xs ${x.days <= 0 ? 'font-bold text-rose-600' : 'text-amber-700'}`}>{dueText(x.days)}</span>
+            </span>
+            <button
+              onClick={() => {
+                x.done()
+                onError(`✅ ${x.title}: hecho`)
+              }}
+              aria-label={`${x.title}: hecho`}
+              className="shrink-0 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 active:scale-95"
+            >
+              ✓ Hecho
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

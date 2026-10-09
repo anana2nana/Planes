@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { saveNote } from '../hooks/useNotes'
 import { useShopping } from '../hooks/useShopping'
-import { IDEA_CATEGORIES, IDEA_ORDER, type IdeaCategory } from '../lib/ideas'
+import { IDEA_CATEGORIES, IDEA_OWN, type IdeaCategory } from '../lib/ideas'
 import { findPlace } from '../lib/maps'
 import { itemKey } from '../lib/shopping'
 import type { Shared, ShareTarget } from '../lib/share'
@@ -44,7 +44,7 @@ export function ShareSheet({
   const partner: PersonId = me === 'nita' ? 'kitos' : 'nita'
   const [target, setTarget] = useState<ShareTarget>(shared.suggested)
   const [title, setTitle] = useState(shared.name || (shared.link ? hostOf(shared.link) : ''))
-  const [category, setCategory] = useState<IdeaCategory>(shared.isMaps ? 'comer' : 'otros')
+  const [category, setCategory] = useState<IdeaCategory>(shared.isMaps ? 'plan' : 'otros')
   const [place, setPlace] = useState<PlaceInfo | null>(null)
   const [finding, setFinding] = useState(shared.isMaps)
   const [gift, setGift] = useState(false)
@@ -176,7 +176,7 @@ export function ShareSheet({
 
         {target === 'idea' && (
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipo de idea">
-            {IDEA_ORDER.map((c) => (
+            {IDEA_OWN.map((c) => (
               <button
                 key={c}
                 type="button"

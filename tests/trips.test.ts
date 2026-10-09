@@ -38,3 +38,26 @@ test('viajes: gastos, maleta y orden', () => {
   assert.equal(tripDates(trip({ start: '2026-05-03', end: '2026-05-07' })), 'Del 3 al 7 may')
   assert.equal(tripDates(trip({})), 'Sin fecha')
 })
+
+import { docWarnings, memoriesDuring, spotsNear } from '../src/lib/trips.ts'
+
+test('viajes: avisos de documentos, recuerdos y sitios cerca', () => {
+  const t = trip({ start: '2026-11-01', end: '2026-11-08', destination: { name: 'Lisboa', address: '', placeId: null, lat: 38.72, lng: -9.14 } })
+  const papers = [
+    { title: 'Pasaporte', kind: 'documento', owner: 'kitos', expires: '2027-02-01' },
+    { title: 'DNI', kind: 'documento', owner: 'nita', expires: '2026-11-05' },
+    { title: 'Pasaporte', kind: 'documento', owner: 'nita', expires: '2030-01-01' },
+    { title: 'Seguro', kind: 'seguro', owner: 'both', expires: '2026-11-02' },
+  ]
+  assert.deepEqual(
+    docWarnings(t, papers).map((w) => `${w.owner} ${w.title} ${w.level} ${w.text}`),
+    ['kitos Pasaporte amber caduca menos de 6 meses después de volver (algunos países lo piden)', 'nita DNI red caduca antes de volver'],
+  )
+  assert.deepEqual(docWarnings(trip({}), papers), [])
+  assert.deepEqual(
+    memoriesDuring(t, [{ date: '2026-10-31' }, { date: '2026-11-03' }, { date: '2026-11-08' }]).map((m) => m.date),
+    ['2026-11-03', '2026-11-08'],
+  )
+  const at = (lat: number, lng: number) => ({ place: { lat, lng } })
+  assert.equal(spotsNear(t, [at(38.71, -9.13), at(40.41, -3.70), { place: null }]).length, 1)
+})

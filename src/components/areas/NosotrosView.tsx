@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { saveCoupleSince, useCouple } from '../../hooks/useCouple'
 import { useIdeas } from '../../hooks/useIdeas'
+import { moveIdeasToModules } from '../../services/ideas'
 import { useMemories } from '../../hooks/useMemories'
 import { useSection } from '../../hooks/useSection'
 import { nextAnniversary, togetherBreakdown, togetherText } from '../../lib/couple'
@@ -42,12 +43,19 @@ export function NosotrosView({
   onPlan: (p: { title: string; place: PlaceInfo | null; notes: string }) => void
 }) {
   const [section, open] = useSection<NosotrosSection>('nosotros')
+  // Las ideas antiguas de comer, pelis y escapadas se mudan a Sitios, Hemeroteca y Viajes.
+  const ideas = useIdeas()
+  useEffect(() => {
+    moveIdeasToModules(ideas)
+      .then((n) => n && onError(`💡 ${n} ${n === 1 ? 'idea se ha movido' : 'ideas se han movido'} a Sitios, Hemeroteca o Viajes`))
+      .catch(() => {})
+  }, [ideas, onError])
   useEffect(() => {
     onTitle(section ? { title: TITLE[section], crumb: 'Nosotros' } : null)
   }, [section, onTitle])
 
   if (section === 'diario') return <DiaryView me={me} onError={onError} />
-  if (section === 'ideas') return <IdeasView me={me} onMakePlan={onMakePlan} onError={onError} />
+  if (section === 'ideas') return <IdeasView me={me} onMakePlan={onMakePlan} onPlan={onPlan} onGo={open} onError={onError} />
   if (section === 'regalos') return <GiftsView me={me} onError={onError} />
   if (section === 'hemeroteca') return <MediaView me={me} onError={onError} />
   if (section === 'sitios') return <SpotsView me={me} onError={onError} onPlan={onPlan} />

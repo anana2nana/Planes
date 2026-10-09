@@ -4,14 +4,18 @@ import { db } from '../../lib/firebase'
 import { arr, millis, num, oneOf, place, removeItem, saveItem, str, useList } from '../../hooks/useList'
 import { useLayer } from '../../hooks/useLayer'
 import { useSheetState } from '../../hooks/useSheetState'
-import { BOOKING_KINDS, BOOKING_ORDER, DEFAULT_PACKING, daysToTrip, mergePacking, nights, packingProgress, sortBookings, sortTrips, spent, tripDates, tripStatus, type Booking, type BookingKind, type PackItem, type Trip } from '../../lib/trips'
+import { BOOKING_KINDS, BOOKING_ORDER, DEFAULT_PACKING, docWarnings, memoriesDuring, spotsNear, daysToTrip, mergePacking, nights, packingProgress, sortBookings, sortTrips, spent, tripDates, tripStatus, type Booking, type BookingKind, type PackItem, type Trip } from '../../lib/trips'
 import type { AssignMode, PersonId, PlaceInfo } from '../../lib/types'
 import { Avatar } from '../Avatar'
 import { BottomSheet } from '../BottomSheet'
 import { DirectionsLink } from '../DirectionsLink'
 import { ChevronIcon, NavigateIcon, PlusIcon, TrashIcon } from '../Icons'
 import { PlaceField } from '../PlaceField'
-import { SpotsMap, useSpots } from '../spots/SpotsView'
+import { SpotSheet, SpotsMap, useSpots } from '../spots/SpotsView'
+import { usePapers } from '../papers/PapersView'
+import { useMemories } from '../../hooks/useMemories'
+import { MemoryView } from '../memories/DiaryView'
+import { SPOT_KINDS, type Spot } from '../../lib/spots'
 
 const parse = (id: string, x: Record<string, any>): Trip => ({
   id,
@@ -207,6 +211,16 @@ function TripDetail({ trip, me, onClose, onError }: { trip: Trip; me: PersonId; 
   const update = (o: Partial<Trip>) => saveItem('trips', { id, ...data, ...o }, me, onError)
   const pack = packingProgress(trip.packing)
   const total = spent(trip)
+  // Conexiones: papeles que caducan, recuerdos de esos días y sitios guardados por allí.
+  const { items: papers } = usePapers()
+  const { memories } = useMemories()
+  const { items: spots } = useSpots()
+  const warnings = status === 'past' ? [] : docWarnings(trip, papers)
+  const trip_memories = memoriesDuring(trip, memories)
+  const near = spotsNear(trip, spots)
+  const [memory, setMemory] = useState<string | null>(null)
+  const [spot, setSpot] = useState<Spot | null>(null)
+  const viewing = memory ? memories.find((m) => m.id === memory) : undefined
 
   return (
     <div className="fixed inset-0 z-[45] overflow-y-auto bg-cream animate-fade-in" role="dialog" aria-label={trip.title}>
@@ -232,6 +246,17 @@ function TripDetail({ trip, me, onClose, onError }: { trip: Trip; me: PersonId; 
         )}
       </div>
 
+      {warnings.length > 0 && (
+        <div className="space-y-1.5 px-4 pt-3">
+          {warnings.map((w) => (
+            <p key={`${w.owner}-${w.title}`} className={`rounded-2xl px-3 py-2.5 text-sm font-semibold ${w.level === 'red' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-800'}`}>
+              {w.level === 'red' ? '⚠️' : '🛂'} {w.title}
+              {w.owner === 'nita' || w.owner === 'kitos' ? ` de ${w.owner === 'nita' ? 'Nita' : 'Kitos'}` : ''}: {w.text} ({new Date(w.expires + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })})
+            </p>
+          ))}
+        </div>
+      )}
+
       <div className="sticky top-0 z-10 bg-cream/90 px-4 py-2 backdrop-blur-xl">
         <div className="grid grid-cols-4 gap-1 rounded-2xl bg-stone-100 p-1" role="tablist" aria-label="Apartado del viaje">
           {(
@@ -239,7 +264,7 @@ function TripDetail({ trip, me, onClose, onError }: { trip: Trip; me: PersonId; 
               ['reservas', `Reservas${trip.bookings.length ? ` ${trip.bookings.length}` : ''}`],
               ['maleta', `Maleta${pack.total ? ` ${pack.done}/${pack.total}` : ''}`],
               ['dinero', 'Dinero'],
-              ['notas', 'Notas'],
+              ['notas', 'Más'],
             ] as [Tab, string][]
           ).map(([t, label]) => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`h-9 rounded-xl text-xs font-bold ${tab === t ? 'bg-surface shadow-sm' : 'text-muted'}`}>
@@ -297,9 +322,52 @@ function TripDetail({ trip, me, onClose, onError }: { trip: Trip; me: PersonId; 
             <Expenses items={trip.expenses} onChange={(expenses) => update({ expenses })} />
           </div>
         )}
-        {tab === 'notas' && <NotesBox value={trip.notes} onSave={(notes) => update({ notes })} />}
+        {tab === 'notas' && (
+          <div className="space-y-5">
+            <NotesBox value={trip.notes} onSave={(notes) => update({ notes })} />
+            {trip_memories.length > 0 && (
+              <section className="space-y-2">
+                <h3 className="px-1 text-xs font-bold uppercase tracking-wider text-muted">📸 Recuerdos de esos días</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {trip_memories.map((m) => (
+                    <button key={m.id} onClick={() => setMemory(m.id)} className="overflow-hidden rounded-2xl bg-surface text-left shadow-sm">
+                      {m.thumb ? <img src={m.thumb} alt="" className="aspect-square w-full object-cover" /> : <span className="grid aspect-square place-items-center text-3xl">📸</span>}
+                      <span className="block truncate px-2 py-1 text-[11px] font-semibold">{m.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            {trip.destination?.lat != null && (
+              <section className="space-y-2">
+                <h3 className="px-1 text-xs font-bold uppercase tracking-wider text-muted">📍 Sitios guardados por allí</h3>
+                {near.length === 0 ? (
+                  <p className="px-1 text-sm text-muted">Ninguno aún. Guardad restaurantes y planes de {trip.destination.name} en Nosotros → Sitios (o compartiéndolos desde Google Maps) y saldrán aquí.</p>
+                ) : (
+                  <ul className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+                    {near.map((x) => (
+                      <li key={x.id}>
+                        <button onClick={() => setSpot(x)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left">
+                          <span className="text-xl" aria-hidden>
+                            {SPOT_KINDS[x.kind].emoji}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold">{x.name}</span>
+                            <span className="block truncate text-xs text-muted">{x.status === 'been' ? 'Ya fuisteis' : 'Queréis ir'}{x.order ? ` · ${x.order}` : ''}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+          </div>
+        )}
       </main>
 
+      {viewing && <MemoryView memory={viewing} onClose={() => setMemory(null)} onError={onError} />}
+      {spot && <SpotSheet draft={spot} me={me} onClose={() => setSpot(null)} onError={onError} />}
       {sheet?.type === 'edit' && <TripSheet draft={{ id, ...data }} me={me} onClose={closeSheet} onError={onError} />}
       {sheet?.type === 'booking' && (
         <BookingSheet

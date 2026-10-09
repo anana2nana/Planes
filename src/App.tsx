@@ -232,6 +232,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
             onMode={setAgendaMode}
             onGo={go}
+            onToast={setToast}
           />
         ) : tab === 'hogar' ? (
           <HogarView me={me} onError={setToast} onTitle={setAreaTitle} />

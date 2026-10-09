@@ -3,6 +3,8 @@ import type { Kind, Plan, PersonId, PriorityConfig, Tag } from '../../lib/types'
 import { CalendarView } from '../CalendarView'
 import { PlansView } from '../PlansView'
 import { useTimeline } from '../../hooks/useTimeline'
+import { markCareDone, usePet } from '../../hooks/usePet'
+import { DueChores } from '../upkeep/UpkeepView'
 import type { TimelineItem } from '../../lib/timeline'
 
 export type AgendaMode = 'calendario' | 'planes' | 'tareas'
@@ -38,6 +40,7 @@ export function AgendaView({
   onCreate,
   onMode,
   onGo,
+  onToast,
 }: {
   plans: Plan[]
   me: PersonId
@@ -49,8 +52,10 @@ export function AgendaView({
   onCreate: (date: string) => void
   onMode: (m: AgendaMode) => void
   onGo: (area: TimelineItem['area'], section: string) => void
+  onToast: (m: string) => void
 }) {
   const extra = useTimeline(me)
+  const { profile, care } = usePet()
   const [mode, setModeState] = useState<AgendaMode>(read)
   useEffect(() => onMode(mode), [mode, onMode])
   const setMode = (m: AgendaMode) => {
@@ -75,7 +80,10 @@ export function AgendaView({
       {mode === 'calendario' ? (
         <CalendarView plans={plans} me={me} tags={tags} priorities={priorities} onOpen={onOpen} onToggle={onToggle} onCreate={onCreate} extra={extra} onGo={onGo} />
       ) : (
-        <PlansView kind={mode === 'planes' ? 'plan' : 'task'} plans={plans} me={me} tags={tags} priorities={priorities} loading={loading} onOpen={onOpen} onToggle={onToggle} />
+        <>
+          {mode === 'tareas' && <DueChores me={me} onError={onToast} petName={profile?.name ?? ''} petCare={care} onPetDone={(c, d) => markCareDone(c, d).catch((e: Error) => onToast(e.message))} />}
+          <PlansView kind={mode === 'planes' ? 'plan' : 'task'} plans={plans} me={me} tags={tags} priorities={priorities} loading={loading} onOpen={onOpen} onToggle={onToggle} />
+        </>
       )}
     </div>
   )

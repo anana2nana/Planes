@@ -107,7 +107,7 @@ function MemoryCard({ memory, onOpen }: { memory: Memory; onOpen: () => void }) 
 }
 
 /** Un recuerdo a pantalla completa: fotos grandes deslizables, la frase y el sitio. */
-export function MemoryView({ memory, onClose, onEdit, onError }: { memory: Memory; onClose: () => void; onEdit: () => void; onError: (m: string) => void }) {
+export function MemoryView({ memory, onClose, onEdit, onError }: { memory: Memory; onClose: () => void; onEdit?: () => void; onError: (m: string) => void }) {
   const close = useLayer('memoryView', onClose)
   const [photos, setPhotos] = useState<MemoryPhoto[] | null>(null)
   const [confirm, setConfirm] = useState(false)
@@ -124,9 +124,11 @@ export function MemoryView({ memory, onClose, onEdit, onError }: { memory: Memor
           <ChevronIcon className="size-4 rotate-180" />
         </button>
         <p className="min-w-0 flex-1 truncate font-extrabold">{memory.title}</p>
-        <button onClick={onEdit} className="rounded-full bg-ink px-3.5 py-2 text-xs font-bold text-cream">
-          Editar
-        </button>
+        {onEdit && (
+          <button onClick={onEdit} className="rounded-full bg-ink px-3.5 py-2 text-xs font-bold text-cream">
+            Editar
+          </button>
+        )}
       </div>
       <main className="mx-auto max-w-2xl space-y-4 pb-24">
         {memory.photoCount > 0 && (
