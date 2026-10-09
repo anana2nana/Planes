@@ -6,11 +6,6 @@ import { NEAR_WINDOW_MS, dueMillis } from '../lib/time'
 import type { Assignee, Plan, PersonId, PriorityConfig, Tag } from '../lib/types'
 import { Avatar } from './Avatar'
 import { NextUp } from './NextUp'
-import { IdeasView } from './IdeasView'
-import { GiftsView } from './GiftsView'
-import { DiaryView } from './memories/DiaryView'
-import { useIdeas } from '../hooks/useIdeas'
-import type { Idea } from '../lib/ideas'
 import { PlanCard } from './PlanCard'
 import { TaskSplit } from './TaskSplit'
 
@@ -27,9 +22,6 @@ interface Props {
   loading: boolean
   onOpen: (plan: Plan) => void
   onToggle: (plan: Plan) => void
-  /** Convertir una idea de "Algún día" en plan. */
-  onMakePlan?: (idea: Idea) => void
-  onError?: (msg: string) => void
 }
 
 function byDueThenPriority(a: Plan, b: Plan) {
@@ -44,10 +36,7 @@ const EMPTY = {
   task: { emoji: '✨', pending: 'Pulsa + para añadir una tarea (limpiar, la gata, el gimnasio…).' },
 }
 
-export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading, onOpen, onToggle, onMakePlan, onError }: Props) {
-  const [mode, setMode] = useState<'dated' | 'someday' | 'gifts' | 'diary'>('dated')
-  const ideas = useIdeas()
-  const pendingIdeas = ideas.filter((i) => !i.done).length
+export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading, onOpen, onToggle }: Props) {
   const [who, setWho] = useState<Who>('all')
   const [status, setStatus] = useState<Status>('pending')
   const plans = useMemo(() => allPlans.filter((p) => p.kind === kind), [allPlans, kind])
@@ -131,39 +120,6 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
 
   return (
     <div className="space-y-5">
-      {kind === 'plan' && (
-        <div className="grid grid-cols-4 rounded-2xl bg-stone-200/60 p-1 text-[11px] font-bold" role="tablist" aria-label="Planes, ideas, regalos o diario">
-          {(
-            [
-              { v: 'dated', emoji: '📅', label: 'Con fecha' },
-              { v: 'someday', emoji: '💡', label: `Algún día${pendingIdeas ? ` · ${pendingIdeas}` : ''}` },
-              { v: 'gifts', emoji: '🎁', label: 'Regalos' },
-              { v: 'diary', emoji: '📸', label: 'Diario' },
-            ] as const
-          ).map((o) => (
-            <button
-              key={o.v}
-              role="tab"
-              aria-selected={mode === o.v}
-              aria-label={o.label}
-              onClick={() => setMode(o.v)}
-              className={`flex flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 transition ${mode === o.v ? 'bg-surface shadow-sm' : 'text-muted'}`}
-            >
-              <span className="text-base leading-none" aria-hidden>
-                {o.emoji}
-              </span>
-              <span className="w-full truncate text-center">{o.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {kind === 'plan' && mode === 'someday' ? (
-        <IdeasView me={me} onMakePlan={(i) => onMakePlan?.(i)} onError={(m) => onError?.(m)} />
-      ) : kind === 'plan' && mode === 'gifts' ? (
-        <GiftsView me={me} onError={(m) => onError?.(m)} />
-      ) : kind === 'plan' && mode === 'diary' ? (
-        <DiaryView me={me} onError={(m) => onError?.(m)} />
-      ) : (
       <>
       {kind === 'task' && <TaskSplit plans={allPlans} />}
       {/* Filtro por persona */}
@@ -230,7 +186,6 @@ export function PlansView({ kind, plans: allPlans, me, tags, priorities, loading
           ))
       )}
       </>
-      )}
     </div>
   )
 }

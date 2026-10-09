@@ -115,7 +115,7 @@ export function MemoryView({ memory, onClose, onEdit, onError }: { memory: Memor
     loadPhotos(memory.id)
       .then(setPhotos)
       .catch((e: Error) => onError(e.message))
-  }, [memory.id, memory.photoCount, onError])
+  }, [memory.id, memory.photoCount, memory.thumb, onError])
 
   return (
     <div className="fixed inset-0 z-[45] overflow-y-auto bg-cream animate-fade-in" role="dialog" aria-label={memory.title}>

@@ -23,14 +23,21 @@ App web móvil privada para una pareja: **Nita** (la dueña del repo, poco técn
 
 Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (Auth con Google, Firestore en tiempo real con caché persistente, Cloud Messaging) · Cloud Functions v2 (Node 22).
 
-- `src/App.tsx` — pestañas **Agenda / Planes / Tareas / Compra / Casa** (Ajustes: tocando el avatar de arriba), botón + (crea el tipo de la pestaña), hoja de edición (ocupa una entrada del historial para que el "atrás" de Android la cierre).
+- **Estructura (oct 2026): 5 áreas generales** en la barra de abajo, pensadas para crecer como un "SAP de casa" (Nita lo quiere así; módulos nuevos = baldosa nueva en su área, no pestañas nuevas):
+  - **Hoy** (`areas/HoyView`): `TodayStrip` (Hoy para ti, comida, recuerdos, "¿qué tal fue?") + tarjetas de cada área (compra, próximo pago MEROE, gata, regalo/aniversario cercano) + "Próximos días". Título: "Viernes 9 oct".
+  - **Agenda** (`areas/AgendaView`): 📅 Calendario · 💞 Planes · 🧹 Tareas (recuerda el apartado; `rememberAgendaMode`); el + crea cita/plan/tarea según el apartado.
+  - **Hogar** (`areas/HogarView`): MEROE (`home/HomeView`, con sus espacios), Compra, Notas, La gata; "Mantenimiento" próximamente.
+  - **Bienestar** (`areas/BienestarView`): Menú, Recetas; Nutrición, Entrenos y Peso próximamente (siguiente paso acordado).
+  - **Nosotros** (`areas/NosotrosView`): "juntos desde hace X años, meses, semanas y días" (`togetherBreakdown`), próximo aniversario, Diario, Algún día, Regalos; Viajes próximamente.
+  - Cada área es una portada con baldosas (`hub/Tile`, `SoonTile`) y espacios con historial (`hooks/useSection`, clave = nombre del área en `history.state`). La cabecera muestra migas ("Hogar · MEROE") y botón atrás (`AreaTitleInfo`). Volver a tocar el área en la barra te lleva a su portada (`navKey`). Ajustes: tocando el avatar (con foto de perfil: `profiles/{persona}`, `useProfilePhotos`).
+  - Pasar callbacks **estables** (useCallback) a `onTitle`: uno nuevo en cada render crea un bucle infinito.
+- `src/App.tsx` — áreas, botón + (en Hoy y Agenda), hoja de edición (ocupa una entrada del historial para que el "atrás" de Android la cierre), `go(area, espacio)` para ir directo a un espacio.
 - `src/lib/` — `types.ts`, `kinds.ts` (textos por tipo), `recurrence.ts` (repeticiones), `time.ts`, `people.ts`, `push.ts` (FCM), `firebase.ts`.
 - `src/services/plans.ts` — todas las escrituras. No se espera a `commit()` en la UI (funciona offline).
 - `src/components/` — `CalendarView` (Agenda), `PlansView` (listas de planes/tareas), `PlanForm`, `PlanCard`, `SettingsView`, `NotificationsSection`, `ErrorBoundary`…
 - `public/sw.js` — service worker que muestra los push (mensajes solo de datos).
 - `functions/src/` — `index.ts` (triggers y tareas programadas), `logic.ts` (qué avisar, puro y testeado), `homeAlerts.ts` (avisos de la casa), `euribor.ts`; `recurrence.ts`, `home.ts`, `pet.ts` y `gifts.ts` son **copias idénticas** de las de `src/lib/` (unos tests lo comprueban).
 - Funciones programadas: `sendReminders` (cada 5 min), `dailyDigest` (cada hora; manda el resumen a quien lo tenga a esa hora, `digestHour` en `config/notifications`), `homeReminders` (20:00: pagos de MEROE de mañana; el día 1, recordatorio de actualizar el ahorro), `updateEuribor` (8:30).
-- **Pestaña Comida** (antes "Compra"; `food/FoodView`): 🛒 Compra · 🍝 Menú · 📖 Recetas (recuerda el último apartado en localStorage; `rememberFoodMode`).
 - **Menú de la semana** (`food/MenuView`, `lib/menu.ts` testeado): colección `meals` con id `yyyy-mm-dd_comida|cena`; comida todos los días y cena solo el finde (entre semana, "+ cena"). Cada uno come `casa | taper | fuera` (martes y miércoles, táper los dos por defecto: Nita lleva táper esos días y Kitos también), `cook` nita/kitos/both (suele cocinar Nita o juntos). "Hacer de más para otros días" copia el plato. "Ingredientes a la compra" junta los de las recetas que quedan (sin cantidades: `ingredientName`; despensa desmarcada). Hoy para ti y el resumen de la mañana muestran la comida; `homeReminders` el domingo avisa si la semana siguiente tiene < 3 comidas.
 - **Recetas ricas**: `lib/recipe.ts` (testeado: `splitQty`, `scaleQty`, `shoppingName`…) — grupos de ingredientes `{q, name}`, fases con pasos (título, texto, chips, `cue` "señal de que va bien", `fix` "si no está bien", `tech` "técnica al detalle", `timer`), consejos, utensilios, créditos. **Importar HTML** (`lib/recipeHtml.ts`, en el navegador con DOMParser): entiende el formato de las recetas de Nita (`ul.ing` con `.q`, `.phase`/`.step`, `.cue`/`.fix`, `details.tech`, `.timer[data-seconds]`, `.tips .card`, `.credit`), si no JSON-LD schema.org/Recipe, si no encabezados "Ingredientes"/"Preparación". Reimportar (mismo título) actualiza. El HTML original se guarda aparte en `recipeHtml/{id}` (≤ 700k) y se ve en un iframe con sandbox ("Original"). `RecipeCook` = modo cocina a pantalla completa (z-[45]: encima de la barra de abajo, debajo de las hojas): tachar ingredientes y marcar pasos (localStorage), raciones ± que reescalan cantidades, temporizadores con hora de fin + vibración + pitido, pantalla siempre encendida (Wake Lock). `RecipeEditor` edita todo (ingredientes por grupo como líneas "300 g harina"). Capas con historial: `hooks/useLayer` (el "atrás" cierra solo la de arriba).
 - **Recetas** (`food/RecipesView`, colección `recipes`): enlace (sobre todo TikTok/Instagram de Diego Doal y Cocina con Carmen, que no tienen web con datos: no se puede importar solo), ingredientes y pasos; "Pegar la descripción del vídeo" los separa (`splitRecipeText`). Compartir un TikTok/YouTube sugiere "Receta".
@@ -68,7 +75,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - `assignee`: `nita` | `kitos` | `both`. "Duplicar" = dos documentos con el mismo `groupId`.
 - `repeat`: `{ days[] (0=domingo), yearly, rotate }`. Planes/tareas: al completar se crea el siguiente documento (`spawnedFrom`); con `rotate` (turnos) el siguiente es para la otra persona. Citas: no se completan; la función `sendReminders` las mueve a su siguiente fecha cuando pasan.
 - Citas de todo el día: avisos referidos a las 9:00. `remindWeekBefore`: aviso extra 7 días antes.
-- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `meals`, `recipes`, `recipeHtml`, `memories`, `memoryPhotos`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona y cifrada), `giftKeys`.
+- Otras colecciones: `tags`, `devices/{tokenFCM}`, `config/priorities`, `config/notifications`, `config/couple` (`since`, `birthdays`), `config/calendar`, `meals`, `recipes`, `recipeHtml`, `memories`, `memoryPhotos`, `ideas`, `receipts`, `pet`, `petCare`, `shopping`, `notes`, `gifts` (privada por persona y cifrada), `giftKeys`, `profiles`.
 
 ## Cómo probar (en este entorno)
 
@@ -94,7 +101,8 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario, compartir, regalos, reparto, notas, menú y recetas, diario.
 
 - **Fase 2 (acordada con Nita)**: ~~menú semanal~~ y ~~diario~~ (hechos); **viajes** (fechas, reservas, maleta reutilizable, presupuesto). Descartado: gastos compartidos tipo Splitwise (no hacen cuentas).
-- Navegación: 5 pestañas abajo, no caben más. Si algo necesita pestaña propia, replantear (p. ej. "Más" o juntar Planes y Tareas). **Nita ha pedido posponer la reorganización: quiere usar más la app antes.**
+- **Siguiente (acordado)**: módulo **Salud** en Bienestar: peso corporal y medidas + entrenos (rutinas, series, kilos, última marca), para los dos (sobre todo Kitos). **Nutrición aproximada** enlazada al menú: calorías/nutrientes por receta y colores por plato (ligero/sano ↔ denso) para ver de un vistazo la semana. Google Fit no: sus APIs cierran y Health Connect no funciona en webs.
+- E2E: `nav.mjs` (en el scratchpad) tiene `go(page, destino)` para la nueva navegación.
 
 - MEROE está en la **Comunidad de Madrid**: AJD 0,75 % del precio sin IVA (anunciada rebaja al 0,4 % para menores de 40 desde 2027, pendiente de aprobar; no sabemos sus edades).
 - La **reserva (5.000 €) no se descuenta del precio**: es un fondo; si sube el precio, la subida se cubre primero con él. En la app: `countsTowardPrice: false`.

@@ -3,7 +3,7 @@ import { eventEmoji } from '../lib/kinds'
 import type { Plan, PersonId } from '../lib/types'
 import { ChevronIcon } from './Icons'
 import { useCouple } from '../hooks/useCouple'
-import { daysTogether, specialDay } from '../lib/couple'
+import { specialDay } from '../lib/couple'
 import { useMeals } from '../hooks/useMenu'
 import { dismissPrompt, readDismissed, useMemories, type MemoryDraft } from '../hooks/useMemories'
 import { eventPrompts, onThisDay, yearsAgo, type Memory } from '../lib/memories'
@@ -45,11 +45,6 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu, onToast = c
     <section className="rounded-3xl bg-gradient-to-br from-amber-50 to-rose-50 p-4 shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-xs font-bold uppercase tracking-wider text-amber-700">☀️ Hoy para ti</h2>
-        {since && (
-          <span className="tabular rounded-full bg-surface/70 px-2.5 py-0.5 text-[11px] font-bold text-rose-600">
-            💞 {daysTogether(since, now).toLocaleString('es-ES', { useGrouping: 'always' })} días juntos
-          </span>
-        )}
       </div>
       {special && <p className="mb-2 rounded-xl bg-surface/80 px-3 py-2 text-sm font-bold text-rose-700">{special}</p>}
       {today.length === 0 ? (

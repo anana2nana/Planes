@@ -19,13 +19,16 @@ import { setIdeaDone } from './services/ideas'
 import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
-import { CalendarIcon, CartIcon, CheckIcon, ChevronIcon, CloudOffIcon, HomeIcon, ListIcon, PlusIcon, SlidersIcon } from './components/Icons'
-import { CalendarView } from './components/CalendarView'
-import { AT_HOME_TITLES, HomeView } from './components/home/HomeView'
-import { FoodView, rememberFoodMode } from './components/food/FoodView'
+import { CalendarIcon, ChevronIcon, CloudOffIcon, HeartIcon, HomeIcon, LeafIcon, PlusIcon, SlidersIcon, SunIcon } from './components/Icons'
 import { PlanForm } from './components/PlanForm'
-import { PlansView } from './components/PlansView'
 import { SettingsView } from './components/SettingsView'
+import { AGENDA_KIND, AgendaView, rememberAgendaMode, type AgendaMode } from './components/areas/AgendaView'
+import { BienestarView } from './components/areas/BienestarView'
+import { HogarView } from './components/areas/HogarView'
+import { HoyView, type Go } from './components/areas/HoyView'
+import { NosotrosView } from './components/areas/NosotrosView'
+import type { AreaTitleInfo } from './components/areas/types'
+import { AREA_KEYS } from './hooks/useSection'
 
 export default function App() {
   const auth = useAuth()
@@ -36,13 +39,11 @@ export default function App() {
   return <Home user={auth.user} me={auth.me} />
 }
 
-type Tab = 'agenda' | 'plans' | 'tasks' | 'shopping' | 'home' | 'settings'
+type Tab = 'hoy' | 'agenda' | 'hogar' | 'bienestar' | 'nosotros' | 'settings'
 type Prefill = { title: string; place: PlaceInfo | null; notes: string }
 type Sheet = { mode: 'new'; kind?: Kind; date?: string; idea?: Idea; prefill?: Prefill } | { mode: 'edit'; id: string } | null
 
-/** Tipo por defecto al pulsar + en cada pestaña. */
-const TAB_KIND: Record<Tab, Kind> = { agenda: 'event', plans: 'plan', tasks: 'task', shopping: 'task', home: 'plan', settings: 'plan' }
-const TAB_TITLE: Record<Tab, string> = { agenda: 'Agenda', plans: 'Planes', tasks: 'Tareas', shopping: 'Comida', home: 'Casa', settings: 'Ajustes' }
+const TAB_TITLE: Record<Tab, string> = { hoy: 'Hoy', agenda: 'Agenda', hogar: 'Hogar', bienestar: 'Bienestar', nosotros: 'Nosotros', settings: 'Ajustes' }
 
 /** Borrador de recuerdo a partir de un plan, cita o tarea. */
 function memoryDraftOf(plan: Plan): MemoryDraft {
@@ -51,6 +52,14 @@ function memoryDraftOf(plan: Plan): MemoryDraft {
   // Si ya pasó, la fecha del plan; si no (se completa antes), hoy.
   const date = due && due < today ? ymd(due) : ymd(today)
   return { title: plan.title, date, kind: plan.kind, planId: plan.id, place: plan.place, text: '' }
+}
+
+function todayTitle() {
+  // "Viernes 9 oct": cabe en la cabecera junto al avatar y "En vivo".
+  const d = new Date()
+  const wd = new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(d)
+  const mo = new Intl.DateTimeFormat('es-ES', { month: 'short' }).format(d).replace('.', '')
+  return `${wd.charAt(0).toUpperCase()}${wd.slice(1)} ${d.getDate()} ${mo}`
 }
 
 function greeting() {
@@ -62,14 +71,33 @@ function Home({ user, me }: { user: User; me: PersonId }) {
   const { plans, sync } = usePlans()
   const tags = useTags()
   const priorities = usePriorities()
-  const [tab, setTabState] = useState<Tab>('agenda')
-  /** Título del espacio abierto dentro de Casa (Plan de pagos, Hipoteca…), o null en la portada. */
-  const [homeTitle, setHomeTitle] = useState<string | null>(null)
+  const [tab, setTabState] = useState<Tab>('hoy')
+  /** Título del espacio abierto dentro de un área (La gata, Plan de pagos…), o null en su portada. */
+  const [areaTitle, setAreaTitle] = useState<AreaTitleInfo | null>(null)
+  /** Apartado de la Agenda (para saber qué crea el botón +). */
+  const [agendaMode, setAgendaMode] = useState<AgendaMode>('calendario')
+  /** Cambia en cada toque de la barra: volver a tocar el área en la que estás te lleva a su portada. */
+  const [navKey, setNavKey] = useState(0)
   const setTab = useCallback((t: Tab) => {
-    // Al salir de un espacio de Casa por la barra inferior, no dejarlo "abierto" en el historial.
-    if (history.state?.casa) history.replaceState(null, '')
+    // Al salir de un área por la barra inferior, no dejar un espacio "abierto" en el historial.
+    if (AREA_KEYS.some((k) => history.state?.[k])) history.replaceState(null, '')
+    setAreaTitle(null)
     setTabState(t)
+    setNavKey((n) => n + 1)
   }, [])
+  /** Ir a un área y, si se indica, directamente a uno de sus espacios (el "atrás" vuelve a la portada del área). */
+  const go = useCallback<Go>(
+    (area, section) => {
+      if (area === 'agenda') {
+        if (section) rememberAgendaMode(section as AgendaMode)
+        setTab('agenda')
+        return
+      }
+      setTab(area)
+      if (section) history.pushState({ [area]: section }, '')
+    },
+    [setTab],
+  )
   const [sheet, setSheet] = useState<Sheet>(null)
   const [memory, setMemory] = useState<{ draft: MemoryDraft; prompt?: 'done' } | null>(null)
   const [shared, setShared] = useState<Shared | null>(null)
@@ -85,6 +113,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     if (sync.error) setToast(`Error de sincronización: ${sync.error}`)
   }, [sync.error])
 
+  const fabKind: Kind = tab === 'agenda' ? AGENDA_KIND[agendaMode] : 'plan'
   const editing = sheet?.mode === 'edit' ? plans.find((p) => p.id === sheet.id) ?? null : null
   const siblings = editing?.groupId ? plans.filter((p) => p.groupId === editing.groupId && p.id !== editing.id) : []
 
@@ -161,13 +190,13 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     <div className="mx-auto min-h-dvh max-w-lg">
       <header className="pt-safe sticky top-0 z-30 bg-cream/85 px-4 pb-3 backdrop-blur-xl">
         <div className="flex items-center gap-3 pt-2">
-          {tab === 'home' && homeTitle ? (
-            <button onClick={() => history.back()} aria-label="Volver a Casa" className="grid size-12 shrink-0 place-items-center rounded-full bg-surface shadow-sm active:scale-95">
+          {areaTitle ? (
+            <button onClick={() => history.back()} aria-label="Volver" className="grid size-12 shrink-0 place-items-center rounded-full bg-surface shadow-sm active:scale-95">
               <ChevronIcon className="size-5 rotate-180" />
             </button>
           ) : (
             <button
-              onClick={() => setTab(tab === 'settings' ? 'agenda' : 'settings')}
+              onClick={() => setTab(tab === 'settings' ? 'hoy' : 'settings')}
               aria-label="Ajustes"
               className="relative shrink-0 rounded-full active:scale-95"
             >
@@ -179,19 +208,20 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           )}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-muted">
-              {tab === 'agenda' ? `${greeting()}, ${PEOPLE[me].name}` : tab === 'home' && homeTitle ? (AT_HOME_TITLES.includes(homeTitle) ? 'Casa' : 'Casa · MEROE') : 'Vuestro espacio'}
+              {areaTitle ? areaTitle.crumb : tab === 'hoy' ? `${greeting()}, ${PEOPLE[me].name}` : 'Vuestro espacio'}
             </p>
-            <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{tab === 'home' && homeTitle ? homeTitle : TAB_TITLE[tab]}</h1>
+            <h1 className="truncate text-2xl font-extrabold leading-tight tracking-tight">{areaTitle ? areaTitle.title : tab === 'hoy' ? todayTitle() : TAB_TITLE[tab]}</h1>
           </div>
           <SyncBadge offline={sync.offline && !sync.loading} pending={sync.pending} />
         </div>
       </header>
 
       <main className="px-4 pb-36 pt-2">
-        <ErrorBoundary inline key={tab}>
-        {tab === 'plans' || tab === 'tasks' ? (
-          <PlansView
-            kind={tab === 'plans' ? 'plan' : 'task'}
+        <ErrorBoundary inline key={`${tab}-${navKey}`}>
+        {tab === 'hoy' ? (
+          <HoyView plans={plans} me={me} onOpen={(p) => openSheet({ mode: 'edit', id: p.id })} onToast={setToast} go={go} />
+        ) : tab === 'agenda' ? (
+          <AgendaView
             plans={plans}
             me={me}
             tags={tags}
@@ -199,29 +229,15 @@ function Home({ user, me }: { user: User; me: PersonId }) {
             loading={sync.loading}
             onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
             onToggle={onToggle}
-            onMakePlan={(idea) => openSheet({ mode: 'new', kind: 'plan', idea })}
-            onError={setToast}
-          />
-        ) : tab === 'agenda' ? (
-          <CalendarView
-            plans={plans}
-            me={me}
-            tags={tags}
-            priorities={priorities}
-            onOpen={(p) => openSheet({ mode: 'edit', id: p.id })}
-            onToggle={onToggle}
             onCreate={(date) => openSheet({ mode: 'new', kind: 'event', date })}
-            onGoTasks={() => setTab('tasks')}
-            onToast={setToast}
-            onGoMenu={() => {
-              rememberFoodMode('menu')
-              setTab('shopping')
-            }}
+            onMode={setAgendaMode}
           />
-        ) : tab === 'shopping' ? (
-          <FoodView me={me} onToast={setToast} />
-        ) : tab === 'home' ? (
-          <HomeView me={me} onError={setToast} onTitle={setHomeTitle} />
+        ) : tab === 'hogar' ? (
+          <HogarView me={me} onError={setToast} onTitle={setAreaTitle} />
+        ) : tab === 'bienestar' ? (
+          <BienestarView me={me} onError={setToast} onTitle={setAreaTitle} />
+        ) : tab === 'nosotros' ? (
+          <NosotrosView me={me} onError={setToast} onTitle={setAreaTitle} onMakePlan={(idea) => openSheet({ mode: 'new', kind: 'plan', idea })} />
         ) : (
           <SettingsView user={user} me={me} tags={tags} plans={plans} priorities={priorities} onError={setToast} />
         )}
@@ -229,10 +245,10 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       </main>
 
       {/* Botón de crear (flotante, abajo a la derecha, como en las apps de Android) */}
-      {tab !== 'home' && tab !== 'settings' && tab !== 'shopping' && <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
+      {(tab === 'hoy' || tab === 'agenda') && <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.75rem)] z-40 mx-auto flex max-w-lg justify-end px-4">
         <button
-          onClick={() => openSheet({ mode: 'new', kind: TAB_KIND[tab] })}
-          aria-label={KINDS[TAB_KIND[tab]].new}
+          onClick={() => openSheet({ mode: 'new', kind: fabKind })}
+          aria-label={KINDS[fabKind].new}
           className="pointer-events-auto grid size-16 place-items-center rounded-[22px] bg-gradient-to-br from-nita via-both to-kitos text-white shadow-xl shadow-violet-500/30 transition active:scale-90"
         >
           <PlusIcon className="size-7" strokeWidth={2.5} />
@@ -242,11 +258,11 @@ function Home({ user, me }: { user: User; me: PersonId }) {
       {/* Barra inferior */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/60 bg-surface/85 backdrop-blur-xl">
         <div className="mx-auto grid max-w-lg grid-cols-5 px-1 pt-2">
+          <NavButton active={tab === 'hoy'} onClick={() => setTab('hoy')} icon={<SunIcon className="size-6" />} label="Hoy" />
           <NavButton active={tab === 'agenda'} onClick={() => setTab('agenda')} icon={<CalendarIcon className="size-6" />} label="Agenda" />
-          <NavButton active={tab === 'plans'} onClick={() => setTab('plans')} icon={<ListIcon className="size-6" />} label="Planes" />
-          <NavButton active={tab === 'tasks'} onClick={() => setTab('tasks')} icon={<CheckIcon className="size-6" strokeWidth={2.5} />} label="Tareas" />
-          <NavButton active={tab === 'shopping'} onClick={() => setTab('shopping')} icon={<CartIcon className="size-6" />} label="Comida" />
-          <NavButton active={tab === 'home'} onClick={() => setTab('home')} icon={<HomeIcon className="size-6" />} label="Casa" />
+          <NavButton active={tab === 'hogar'} onClick={() => setTab('hogar')} icon={<HomeIcon className="size-6" />} label="Hogar" />
+          <NavButton active={tab === 'bienestar'} onClick={() => setTab('bienestar')} icon={<LeafIcon className="size-6" />} label="Bienestar" />
+          <NavButton active={tab === 'nosotros'} onClick={() => setTab('nosotros')} icon={<HeartIcon className="size-6" />} label="Nosotros" />
         </div>
       </nav>
 
@@ -261,7 +277,8 @@ function Home({ user, me }: { user: User; me: PersonId }) {
           onMakePlan={(prefill) => {
             // Reutiliza la misma entrada del historial: el "atrás" cierra el formulario.
             setShared(null)
-            setTab('plans')
+            rememberAgendaMode('planes')
+            setTab('agenda')
             openSheet({ mode: 'new', kind: 'plan', prefill })
           }}
         />

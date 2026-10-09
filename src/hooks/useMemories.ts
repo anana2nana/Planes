@@ -80,6 +80,12 @@ export async function saveMemory(
   const ref = d.id ? doc(memories, d.id) : doc(memories)
   const { id: _id, ...data } = d
   void _id
+  // Primero las fotos y luego el recuerdo: así, quien esté mirándolo recarga las fotos ya actualizadas.
+  // Una foto por documento (cada una cerca del límite de 1 MB de Firestore).
+  await Promise.all([
+    ...opts.added.map((p, i) => setDoc(doc(photos), { memoryId: ref.id, data: p.full, order: opts.firstOrder + i, by: me })),
+    ...opts.removed.map((id) => deleteDoc(doc(photos, id))),
+  ])
   await setDoc(
     ref,
     {
@@ -94,11 +100,6 @@ export async function saveMemory(
     },
     { merge: true },
   )
-  // Una foto por documento (cada una cerca del límite de 1 MB de Firestore).
-  await Promise.all([
-    ...opts.added.map((p, i) => setDoc(doc(photos), { memoryId: ref.id, data: p.full, order: opts.firstOrder + i, by: me })),
-    ...opts.removed.map((id) => deleteDoc(doc(photos, id))),
-  ])
   return ref.id
 }
 

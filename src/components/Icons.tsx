@@ -78,3 +78,12 @@ export const HomeIcon = (p: P) => (
 export const CartIcon = (p: P) => (
   <svg {...base} {...p}><path d="M3 4h2l2.2 11h10.6L20 7H6.2" /><circle cx="9" cy="19.5" r="1.5" /><circle cx="17" cy="19.5" r="1.5" /></svg>
 )
+export const SunIcon = (p: P) => (
+  <svg {...base} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4" /></svg>
+)
+export const HeartIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M12 20s-7.5-4.6-9.2-9.3C1.6 7.4 3.8 4.5 7 4.5c2 0 3.4 1.1 5 3 1.6-1.9 3-3 5-3 3.2 0 5.4 2.9 4.2 6.2C19.5 15.4 12 20 12 20z" /></svg>
+)
+export const LeafIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M5 19c0-8 5-13.5 15-14-.4 9.6-6 15-14 15" /><path d="M5 19c3-4 6-6.5 9.5-8.5" /></svg>
+)
