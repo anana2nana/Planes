@@ -198,7 +198,7 @@ export function PaymentsView({
   )
 }
 
-function ItemRow({ item, config, money, onClick }: { item: HomeItem; config: HomeConfig; money: (v: number) => string; onClick: () => void }) {
+export function ItemRow({ item, config, money, onClick }: { item: HomeItem; config: HomeConfig; money: (v: number) => string; onClick: () => void }) {
   const now = new Date()
   const t = itemTotals(item, config, now)
   const unit = unitAmount(item.amount, config)

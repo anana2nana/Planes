@@ -12,12 +12,13 @@ import { HomeSetup } from './HomeSetup'
 import { ItemForm } from './ItemForm'
 import { MortgageView } from './MortgageView'
 import { PaymentsView } from './PaymentsView'
+import { FurnitureView } from './FurnitureView'
 import { SavingsView } from './SavingsView'
 import { Label, NumberField, Segmented } from './ui'
 
-type Section = 'pagos' | 'hipoteca' | 'llegamos'
+type Section = 'pagos' | 'hipoteca' | 'llegamos' | 'muebles'
 
-const SECTION_TITLE: Record<Section, string> = { pagos: 'Plan de pagos', hipoteca: 'Hipoteca', llegamos: '¿Llegamos?' }
+const SECTION_TITLE: Record<Section, string> = { pagos: 'Plan de pagos', hipoteca: 'Hipoteca', llegamos: '¿Llegamos?', muebles: 'Muebles' }
 
 const PER_PERSON_KEY = 'nitakitos.home.perPerson'
 const readPerPerson = () => {
@@ -114,6 +115,9 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
             onOpenMortgage={() => open('hipoteca')}
           />
         )}
+        {section === 'muebles' && (
+          <FurnitureView config={config} items={items} money={money} onEditItem={(item, category) => openSheet({ type: 'item', item, category })} onEditBudgets={() => openSheet({ type: 'budgets' })} />
+        )}
         {section === 'hipoteca' && <MortgageView config={config} items={items} euribor={euribor} money={eur} onError={onError} />}
         {section === 'llegamos' && <SavingsView config={config} items={items} funds={funds} me={me} money={money} onError={onError} />}
         {sheets}
@@ -171,7 +175,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
             </>
           )}
         </Tile>
-        <Tile emoji="🛋️" title="Muebles" muted={furnitureBudget === 0 && furnitureSpent === 0} onClick={() => open('pagos')}>
+        <Tile emoji="🛋️" title="Muebles" muted={furnitureBudget === 0 && furnitureSpent === 0} onClick={() => open('muebles')}>
           {furnitureBudget > 0 ? (
             <>
               <b className="tabular text-ink">{money(furnitureSpent)}</b> de {money(furnitureBudget)}
