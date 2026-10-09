@@ -11,7 +11,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
 import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
-import { giftPushes, homePushes, petPushes, type GiftLite } from './homeAlerts.js'
+import { giftPushes, homePushes, petPushes, type GiftLite, capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes, type UpkeepLite } from './homeAlerts.js'
 import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
 import type { CareItem } from './pet.js'
 import type { Amount, CategoryId, Fund, HomeConfig, HomeItem, MonthlySchedule } from './home.js'
@@ -294,6 +294,50 @@ export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Eur
     .filter((g): g is GiftLite => g.owner === 'nita' || g.owner === 'kitos')
   const birthdays = { nita: md(coupleSnap.get('birthdays')?.nita), kitos: md(coupleSnap.get('birthdays')?.kitos) }
   for (const push of giftPushes(gifts, birthdays, typeof since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(since) ? since : null, prefs, new Date())) await send(push)
+
+  // Papeles que caducan, mantenimiento, cobros, citas médicas y cartas de la cápsula.
+  const [papersSnap, upkeepSnap, subsSnap, healthSnap, capsSnap] = await Promise.all(['papers', 'upkeep', 'subs', 'health', 'capsules'].map((c) => db.collection(c).get()))
+  const s = (v: unknown) => (typeof v === 'string' ? v : '')
+  const owner = (v: unknown) => (v === 'nita' || v === 'kitos' ? v : 'both') as 'nita' | 'kitos' | 'both'
+  const now = new Date()
+  const extra = [
+    ...paperPushes(papersSnap.docs.map((d) => ({ title: s(d.get('title')), kind: s(d.get('kind')), owner: owner(d.get('owner')), expires: s(d.get('expires')) || null })), prefs, now),
+    ...upkeepPushes(
+      upkeepSnap.docs.map((d): UpkeepLite => ({
+        id: d.id,
+        title: s(d.get('title')),
+        area: d.get('area') === 'coche' ? 'coche' : 'casa',
+        every: d.get('every')?.n && d.get('every')?.unit ? d.get('every') : { n: 1, unit: 'year' },
+        last: s(d.get('last')) || null,
+        history: [],
+      })),
+      prefs,
+      now,
+    ),
+    ...subPushes(
+      subsSnap.docs.map((d) => ({
+        name: s(d.get('name')),
+        price: Number(d.get('price')) || 0,
+        period: ['month', 'quarter', 'year'].includes(d.get('period')) ? d.get('period') : 'month',
+        from: s(d.get('from')),
+        payer: owner(d.get('payer')),
+        remind: d.get('remind') === true,
+        active: d.get('active') !== false,
+      })).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.from)),
+      prefs,
+      now,
+    ),
+    ...healthPushes(
+      healthSnap.docs.map((d) => ({ owner: d.get('owner') === 'kitos' ? ('kitos' as const) : ('nita' as const), kind: s(d.get('kind')), date: s(d.get('date')) || null, next: s(d.get('next')) || null })),
+      prefs,
+      now,
+    ),
+    ...capsulePushes(
+      capsSnap.docs.map((d) => ({ from: d.get('from') === 'kitos' ? ('kitos' as const) : ('nita' as const), to: owner(d.get('to')), openAt: s(d.get('openAt')) })).filter((c) => c.openAt),
+      now,
+    ),
+  ]
+  for (const push of extra) await send(push)
 
   // Domingo: ¿está hecho el menú de la semana que viene?
   if (new Date().getDay() === 0) {

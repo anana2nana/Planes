@@ -423,3 +423,54 @@ test('diario: tal día como hoy en el resumen', () => {
   assert.equal(onThisDayLine([{ title: 'Playa', date: '2023-10-08' }], now), '📸 Tal día como hoy, hace 3 años: Playa')
   assert.equal(onThisDayLine([], now), null)
 })
+
+import { capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes } from './homeAlerts.js'
+
+test('src/due.ts es idéntico al de la app', () => {
+  const here = fileURLToPath(new URL('../src/due.ts', import.meta.url))
+  const app = fileURLToPath(new URL('../../src/lib/due.ts', import.meta.url))
+  assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
+})
+
+test('papeles: avisos de caducidad a su dueño (garantías, solo un mes antes)', () => {
+  const prefs = { nita: { ...DEFAULT_PREFS, home: true }, kitos: { ...DEFAULT_PREFS, home: true } }
+  const now = new Date('2026-10-09T20:00:00')
+  const papers = [
+    { title: 'DNI', kind: 'documento', owner: 'nita' as const, expires: '2026-11-08' },
+    { title: 'Seguro de hogar', kind: 'seguro', owner: 'both' as const, expires: '2026-10-16' },
+    { title: 'Lavadora', kind: 'garantia', owner: 'both' as const, expires: '2026-11-08' },
+    { title: 'Pasaporte', kind: 'documento', owner: 'kitos' as const, expires: '2026-11-07' },
+  ]
+  const p = paperPushes(papers, prefs, now)
+  assert.deepEqual(
+    p.map((x) => `${x.to}: ${x.title}`),
+    ['nita: 🪪 DNI de Nita: caduca en 30 días', 'nita: 🛡️ Seguro de hogar: caduca en una semana', 'kitos: 🛡️ Seguro de hogar: caduca en una semana', 'nita: 🧾 La garantía de «Lavadora» acaba en un mes', 'kitos: 🧾 La garantía de «Lavadora» acaba en un mes'],
+  )
+})
+
+test('mantenimiento, suscripciones, salud y cápsula', () => {
+  const prefs = { nita: { ...DEFAULT_PREFS, home: true }, kitos: { ...DEFAULT_PREFS, home: false } }
+  const now = new Date('2026-10-09T20:00:00')
+  const up = upkeepPushes([{ id: 'c', title: 'Revisión de la caldera', every: { n: 1, unit: 'year' }, last: '2025-10-10', history: [], area: 'casa' }], prefs, now)
+  assert.equal(up.length, 1)
+  assert.equal(up[0].title, '🧰 Mañana toca en casa')
+  const subs = [
+    { name: 'Prime', price: 49.9, period: 'year' as const, from: '2025-10-16', payer: 'both' as const, remind: false, active: true },
+    { name: 'Netflix', price: 13.99, period: 'month' as const, from: '2026-09-11', payer: 'nita' as const, remind: false, active: true },
+    { name: 'Spotify', price: 17.99, period: 'month' as const, from: '2026-09-11', payer: 'nita' as const, remind: true, active: true },
+  ]
+  assert.deepEqual(
+    subPushes(subs, prefs, now).map((x) => x.title.replace(/\u00a0/g, ' ')),
+    ['💳 Prime se cobra en una semana (49,90 €)', '💳 Spotify se cobra pasado mañana (17,99 €)'],
+  )
+  const h = healthPushes([{ owner: 'nita', kind: 'revision', date: '2025-10-10', next: '2026-10-10' }, { owner: 'kitos', kind: 'cita', date: '2026-10-10', next: null }], prefs, now)
+  assert.deepEqual(
+    h.map((x) => `${x.to}: ${x.title}`),
+    ['nita: 🩺 Mañana tienes una revisión'],
+  )
+  const c = capsulePushes([{ from: 'nita', to: 'both', openAt: '2026-10-10' }, { from: 'kitos', to: 'nita', openAt: '2026-12-24' }], now)
+  assert.deepEqual(
+    c.map((x) => `${x.to}: ${x.title}`),
+    ['kitos: 💌 Mañana podrás abrir una carta de Nita'],
+  )
+})

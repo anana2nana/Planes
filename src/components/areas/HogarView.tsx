@@ -12,12 +12,14 @@ import { NotesView } from '../home/NotesView'
 import { PetView } from '../home/PetView'
 import { ShoppingView } from '../ShoppingView'
 import { PapersView, paperDays, usePapers } from '../papers/PapersView'
-import { expiryLevel } from '../../lib/due'
-import { AreaTitle, SoonTile, Tile } from '../hub/Tile'
+import { expiryLevel, monthlyCost, nextRenewal, daysTo } from '../../lib/due'
+import { CarView, UpkeepView, useUpkeep } from '../upkeep/UpkeepView'
+import { SubsView, useSubs } from '../subs/SubsView'
+import { AreaTitle, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles'
-const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles' }
+type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles' | 'mantenimiento' | 'coche' | 'suscripciones'
+const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles', mantenimiento: 'Mantenimiento', coche: 'El coche', suscripciones: 'Suscripciones' }
 
 /** Hogar: la casa (MEROE), la compra, la gata y las notas. Cada cosa es un espacio. */
 export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void }) {
@@ -34,6 +36,9 @@ export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m:
   if (section === 'gata') return <PetView onError={onError} />
   if (section === 'notas') return <NotesView me={me} onError={onError} onToast={onError} />
   if (section === 'papeles') return <PapersView me={me} onError={onError} />
+  if (section === 'mantenimiento') return <UpkeepView me={me} area="casa" onError={onError} />
+  if (section === 'coche') return <CarView me={me} onError={onError} />
+  if (section === 'suscripciones') return <SubsView me={me} onError={onError} />
   return <HogarHub onOpen={open} />
 }
 
@@ -48,6 +53,18 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
   const due = care.filter((c) => c.last).map((c) => ({ c, days: daysUntil(nextDue(c, today), today) })).sort((a, b) => a.days - b.days)
   const late = due.filter((d) => d.days <= 0)
   const { items: papers } = usePapers()
+  const { items: upkeep } = useUpkeep()
+  const upDue = (area: 'casa' | 'coche') =>
+    upkeep
+      .filter((u) => u.area === area && u.last)
+      .map((u) => ({ u, days: daysUntil(nextDue(u, today), today) }))
+      .sort((a, b) => a.days - b.days)
+  const casaDue = upDue('casa')
+  const cocheDue = upDue('coche')
+  const { items: subs } = useSubs()
+  const activeSubs = subs.filter((s) => s.active)
+  const subsMonth = activeSubs.reduce((t, s) => t + monthlyCost(s.price, s.period), 0)
+  const nextSub = activeSubs.map((s) => ({ s, d: daysTo(nextRenewal(s.from, s.period, today), today) })).sort((a, b) => a.d - b.d)[0]
   const expiring = papers.filter((p) => ['soon', 'urgent', 'expired'].includes(expiryLevel(paperDays(p)))).sort((a, b) => (a.expires ?? '').localeCompare(b.expires ?? ''))
 
   return (
@@ -108,9 +125,31 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
               'Vacunas, desparasitar, peso, veterinario…'
             )}
           </Tile>
-          <SoonTile emoji="🧰" title="Mantenimiento">
-            Revisiones, garantías, facturas de la luz… cuando lo necesitéis
-          </SoonTile>
+          <Tile emoji="🧰" title="Mantenimiento" onClick={() => onOpen('mantenimiento')} muted={!upkeep.some((u) => u.area === 'casa')}>
+            {casaDue[0] && casaDue[0].days <= 0 ? (
+              <b className="text-rose-600">Toca: {casaDue[0].u.title}</b>
+            ) : casaDue[0] ? (
+              <>
+                Próximo: <b className="text-ink">{casaDue[0].u.title}</b>
+                <span className="block">{casaDue[0].days === 1 ? 'mañana' : casaDue[0].days < 60 ? `en ${casaDue[0].days} días` : `en ${Math.round(casaDue[0].days / 30.4)} meses`}</span>
+              </>
+            ) : (
+              'Caldera, filtros, detector de humo… cada cuánto toca'
+            )}
+          </Tile>
+          <Tile emoji="🚗" title="El coche" onClick={() => onOpen('coche')} muted={!upkeep.some((u) => u.area === 'coche') && !papers.some((p) => p.kind === 'coche')}>
+            {cocheDue[0] && cocheDue[0].days <= 7 ? <b className={cocheDue[0].days <= 0 ? 'text-rose-600' : 'text-ink'}>{cocheDue[0].days <= 0 ? `Toca: ${cocheDue[0].u.title}` : `${cocheDue[0].u.title} en ${cocheDue[0].days} días`}</b> : 'ITV, seguro, aceite, ruedas…'}
+          </Tile>
+          <Tile emoji="💳" title="Suscripciones" onClick={() => onOpen('suscripciones')} muted={activeSubs.length === 0}>
+            {activeSubs.length === 0 ? (
+              'Netflix, gimnasio, móvil… cuánto suman'
+            ) : (
+              <>
+                <b className="tabular text-ink">{eur(Math.round(subsMonth))}</b> al mes
+                {nextSub && <span className="block truncate">{nextSub.s.name}: {nextSub.d === 0 ? 'hoy' : nextSub.d === 1 ? 'mañana' : `en ${nextSub.d} días`}</span>}
+              </>
+            )}
+          </Tile>
         </div>
       </section>
     </div>

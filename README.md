@@ -18,6 +18,12 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **🍝 Menú de la semana y recetas** (Bienestar): comidas de cada día y cenas del finde, quién lleva táper, quién cocina, recetario con el enlace al vídeo, ingredientes por grupos y pasos con señales y temporizadores (se pueden importar recetas en HTML y editarlas; modo cocina con raciones ajustables y pantalla siempre encendida), y un botón que pasa los ingredientes de la semana a la compra.
 - **🥗 Nutrición aproximada** (Bienestar): cada plato lleva un color (🟢 ligero · 🟡 normal · 🔴 contundente) y unas calorías aproximadas, calculados con los ingredientes de la receta (o por el nombre si no hay receta) y corregibles a mano. El menú avisa si la semana va contundente y propone recetas ligeras.
 - **🏋️ Entrenos y ⚖️ peso** (Bienestar): rutinas por grupos musculares (con plantillas), entreno en directo con la última marca, kilos prellenados, descanso con aviso y récords; «Hoy toca…» en la pantalla de Hoy. El peso y las medidas son privados de cada uno.
+- **🎬 Hemeroteca** (Nosotros): pelis, series y libros pendientes, a medias y vistos, con portada, la nota de cada uno, ruleta «¿qué vemos hoy?» y vuestro año.
+- **📍 Sitios** (Nosotros): restaurantes y planes, los de siempre y los pendientes, con mapa, qué pedir y visitas.
+- **✈️ Viajes** (Nosotros): reservas con localizador, maleta reutilizable, presupuesto y mapa de dónde habéis estado.
+- **📍 Hitos, 🎵 banda sonora y 💌 cápsula del tiempo** (Nosotros): vuestra historia, vuestras canciones y cartas que no se pueden abrir hasta su fecha.
+- **🧾 Papeles, 🧰 mantenimiento, 🚗 coche y 💳 suscripciones** (Hogar): garantías y documentos que caducan, lo que toca cada cierto tiempo y cuánto suman los cobros, con avisos.
+- **🩺 Médico** (Bienestar): ficha, citas, vacunas y medicación de cada uno (privado).
 - **🛒 Lista de la compra** compartida en tiempo real, por secciones, con "lo de siempre" (aprende lo que compráis).
 - **☀️ Resumen del día**: cada mañana, a la hora que elija cada uno, un aviso con lo de hoy; y la franja "Hoy para ti" en la Agenda.
 - **🏗️ Avisos de la casa**: la víspera de cada pago de la cooperativa, y el día 1 recordatorio para actualizar el ahorro.

@@ -293,6 +293,34 @@ service cloud.firestore {
       allow delete: if isCouple() && resource.data.from == me();
     }
 
+    // Mantenimiento (casa y coche) y suscripciones.
+    match /upkeep/{upkeepId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+    }
+    match /subs/{subId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.price is number;
+    }
+
+    // 🩺 Salud: cada uno solo ve lo suyo (citas, vacunas, medicación y su ficha).
+    match /health/{healthId} {
+      allow read, delete: if isCouple() && resource.data.owner == me();
+      allow create, update: if isCouple()
+        && request.resource.data.owner == me()
+        && (resource == null || resource.data.owner == me())
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+    }
+    match /healthProfile/{person} {
+      allow read, write: if isCouple() && person == me();
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();

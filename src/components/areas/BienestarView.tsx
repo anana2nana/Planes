@@ -9,14 +9,15 @@ import { ColorDot } from '../food/Nutrition'
 import { NutritionView } from '../food/NutritionView'
 import { BodyView } from '../fitness/BodyView'
 import { TrainingView } from '../fitness/TrainingView'
+import { HealthView, upcomingDate, useHealth } from '../health/HealthView'
 import { useBodyLogs, useRoutines, useWorkouts } from '../../hooks/useFitness'
 import { routineForToday, streak, weightTrend } from '../../lib/fitness'
 import { RecipesView } from '../food/RecipesView'
 import { AreaTitle, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-export type BienestarSection = 'menu' | 'recetas' | 'nutricion' | 'entrenos' | 'peso'
-const TITLE: Record<BienestarSection, string> = { menu: 'Menú de la semana', recetas: 'Recetas', nutricion: 'Nutrición', entrenos: 'Entrenos', peso: 'Peso y medidas' }
+export type BienestarSection = 'menu' | 'recetas' | 'nutricion' | 'entrenos' | 'peso' | 'medico'
+const TITLE: Record<BienestarSection, string> = { menu: 'Menú de la semana', recetas: 'Recetas', nutricion: 'Nutrición', entrenos: 'Entrenos', peso: 'Peso y medidas', medico: 'Médico' }
 
 /** Bienestar: lo que coméis (menú y recetas) y, pronto, entrenos, peso y nutrición. */
 export function BienestarView({ me, onError, onTitle }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void }) {
@@ -30,6 +31,7 @@ export function BienestarView({ me, onError, onTitle }: { me: PersonId; onError:
   if (section === 'nutricion') return <NutritionView me={me} onError={onError} />
   if (section === 'entrenos') return <TrainingView me={me} onError={onError} />
   if (section === 'peso') return <BodyView me={me} onError={onError} />
+  if (section === 'medico') return <HealthView me={me} onError={onError} />
   return <BienestarHub me={me} onOpen={open} />
 }
 
@@ -50,6 +52,11 @@ function BienestarHub({ me, onOpen }: { me: PersonId; onOpen: (s: BienestarSecti
   const st = streak(mine, today)
   const { logs } = useBodyLogs(me)
   const trend = weightTrend(logs, today)
+  const { items: health } = useHealth(me)
+  const nextHealth = health
+    .map((h) => ({ h, d: upcomingDate(h, today) }))
+    .filter((x): x is { h: (typeof health)[number]; d: string } => x.d !== null)
+    .sort((a, b) => a.d.localeCompare(b.d))[0]
 
   return (
     <div className="space-y-5">
@@ -116,6 +123,15 @@ function BienestarHub({ me, onOpen }: { me: PersonId; onOpen: (s: BienestarSecti
               </>
             ) : (
               'Lo tuyo, con su gráfica (solo lo ves tú)'
+            )}
+          </Tile>
+          <Tile emoji="🩺" title="Médico" onClick={() => onOpen('medico')} wide muted={health.length === 0}>
+            {nextHealth ? (
+              <>
+                Próximo: <b className="text-ink">{nextHealth.h.title}</b> el {new Date(nextHealth.d + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} · 🔒 solo tú
+              </>
+            ) : (
+              'Tu ficha (alergias, grupo sanguíneo…), citas, vacunas y medicación · 🔒 solo tú'
             )}
           </Tile>
         </div>

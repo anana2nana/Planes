@@ -139,3 +139,123 @@ export function giftPushes(
   }
   return pushes
 }
+
+// ─── Papeles, mantenimiento, suscripciones, salud y cápsula ────────────────
+
+import { EXPIRY_LEADS, RENEWAL_LEAD, daysTo, nextRenewal, type Period } from './due.js'
+
+type Owner = Person | 'both'
+const toWhom = (o: Owner): Person[] => (o === 'both' ? ['nita', 'kitos'] : [o])
+
+export interface PaperLite {
+  title: string
+  kind: string
+  owner: Owner
+  expires: string | null
+}
+const PAPER_EMOJI: Record<string, string> = { garantia: '🧾', documento: '🪪', seguro: '🛡️', coche: '🚗', contrato: '📄' }
+
+/** Documentos, seguros y garantías que caducan: 60, 30 y 7 días antes y el mismo día (las garantías, solo 30 días antes). */
+export function paperPushes(papers: PaperLite[], prefs: Record<Person, NotifPrefs>, now: Date): Push[] {
+  const pushes: Push[] = []
+  for (const p of papers) {
+    if (!p.expires) continue
+    const d = daysTo(p.expires, now)
+    const leads = p.kind === 'garantia' ? [30] : EXPIRY_LEADS
+    if (!leads.includes(d)) continue
+    const whose = p.owner === 'both' ? '' : ` de ${NAME[p.owner]}`
+    const title =
+      p.kind === 'garantia'
+        ? `🧾 La garantía de «${p.title}» acaba en un mes`
+        : `${PAPER_EMOJI[p.kind] ?? '📎'} ${p.title}${whose}: ${d === 0 ? 'caduca hoy' : d === 7 ? 'caduca en una semana' : `caduca en ${d} días`}`
+    const body = p.kind === 'garantia' ? '¿Funciona todo bien? Si no, aún estáis a tiempo de reclamar. Está en Hogar → Papeles.' : 'Pide cita para renovarlo con tiempo. Está en Hogar → Papeles.'
+    for (const to of toWhom(p.owner)) if (prefs[to].home) pushes.push({ to, kind: 'reminder', title, body, tag: `paper-${p.title}` })
+  }
+  return pushes
+}
+
+export interface UpkeepLite extends CareItem {
+  area: 'casa' | 'coche'
+}
+
+/** Mantenimiento de la casa y del coche: la víspera y, si se queda pendiente, una vez por semana. */
+export function upkeepPushes(items: UpkeepLite[], prefs: Record<Person, NotifPrefs>, now: Date): Push[] {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const pushes: Push[] = []
+  for (const area of ['casa', 'coche'] as const) {
+    const due = items.filter((c) => {
+      if (c.area !== area || !c.last) return false
+      const d = daysUntil(nextDue(c, today), today)
+      return d === 1 || (d <= 0 && d % 7 === 0)
+    })
+    if (!due.length) continue
+    const late = due.filter((c) => daysUntil(nextDue(c, today), today) <= 0)
+    const icon = area === 'casa' ? '🧰' : '🚗'
+    const title = late.length === due.length ? `${icon} Pendiente ${area === 'casa' ? 'en casa' : 'con el coche'}` : `${icon} Mañana toca ${area === 'casa' ? 'en casa' : 'con el coche'}`
+    const body = `${due.map((c) => `${c.title}${late.includes(c) ? ' (pendiente)' : ''}`).join('\n')}\nMárcalo como hecho en Hogar → ${area === 'casa' ? 'Mantenimiento' : 'El coche'}.`
+    for (const to of ['nita', 'kitos'] as Person[]) if (prefs[to].home) pushes.push({ to, kind: 'reminder', title, body, tag: `upkeep-${area}` })
+  }
+  return pushes
+}
+
+export interface SubLite {
+  name: string
+  price: number
+  period: Period
+  from: string
+  payer: Owner
+  remind: boolean
+  active: boolean
+}
+
+/** Una semana antes de cada cobro anual o trimestral (y de los mensuales si se pidió). */
+export function subPushes(subs: SubLite[], prefs: Record<Person, NotifPrefs>, now: Date): Push[] {
+  const pushes: Push[] = []
+  for (const s of subs) {
+    if (!s.active || (s.period === 'month' && !s.remind)) continue
+    const lead = s.period === 'month' ? 2 : RENEWAL_LEAD
+    if (daysTo(nextRenewal(s.from, s.period, now), now) !== lead) continue
+    const price = s.price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
+    const title = `💳 ${s.name} se cobra ${lead === 7 ? 'en una semana' : 'pasado mañana'} (${price})`
+    for (const to of toWhom(s.payer)) if (prefs[to].home) pushes.push({ to, kind: 'reminder', title, body: '¿Lo seguís usando? Si no, es buen momento para darlo de baja.', tag: `sub-${s.name}` })
+  }
+  return pushes
+}
+
+export interface HealthLite {
+  owner: Person
+  kind: string
+  date: string | null
+  next: string | null
+}
+const HEALTH_LABEL: Record<string, string> = { cita: 'una cita médica', revision: 'una revisión', vacuna: 'una vacuna', analitica: 'un análisis', medicacion: 'algo de medicación', otro: 'algo de salud' }
+
+/** La víspera de una cita o revisión, solo a su dueño y sin detalles (puede verse con la pantalla bloqueada). */
+export function healthPushes(items: HealthLite[], prefs: Record<Person, NotifPrefs>, now: Date): Push[] {
+  const pushes: Push[] = []
+  for (const to of ['nita', 'kitos'] as Person[]) {
+    if (!prefs[to].home) continue
+    const mine = items.filter((h) => h.owner === to && [h.date, h.next].some((d) => d && daysTo(d, now) === 1))
+    if (!mine.length) continue
+    const what = mine.length === 1 ? HEALTH_LABEL[mine[0].kind] ?? 'algo de salud' : `${mine.length} cosas de salud`
+    pushes.push({ to, kind: 'reminder', title: `🩺 Mañana tienes ${what}`, body: 'Lo tienes en Bienestar → Médico.', tag: 'health' })
+  }
+  return pushes
+}
+
+export interface CapsuleLite {
+  from: Person
+  to: Owner
+  openAt: string
+}
+
+/** El día antes de que se pueda abrir una carta de la cápsula, a quien va dirigida. */
+export function capsulePushes(caps: CapsuleLite[], now: Date): Push[] {
+  const pushes: Push[] = []
+  for (const c of caps) {
+    if (daysTo(c.openAt, now) !== 1) continue
+    for (const to of toWhom(c.to).filter((p) => p !== c.from))
+      pushes.push({ to, kind: 'reminder', title: `💌 Mañana podrás abrir una carta de ${NAME[c.from]}`, body: 'Está guardada en Nosotros → Cápsula del tiempo.', tag: `capsule-${c.openAt}` })
+  }
+  return pushes
+}
