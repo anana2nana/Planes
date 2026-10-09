@@ -244,6 +244,55 @@ service cloud.firestore {
         && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
     }
 
+    // Viajes (con reservas, maleta y gastos dentro), banda sonora e hitos.
+    match /trips/{tripId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+    }
+    match /songs/{songId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100;
+    }
+    match /milestones/{milestoneId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+        && request.resource.data.date is string;
+    }
+
+    // 💌 Cápsula del tiempo: el sobre lo ven los dos; la carta, quien la escribe y,
+    // a partir de su fecha, a quien va dirigida (ni antes, ni desde la consola de la app).
+    match /capsules/{capsuleId} {
+      allow read: if isCouple();
+      allow create: if isCouple()
+        && request.resource.data.from == me()
+        && request.resource.data.to in ['nita', 'kitos', 'both']
+        && request.resource.data.to != me()
+        && request.resource.data.openAtTs is timestamp;
+      allow update: if isCouple() && (
+        (resource.data.from == me() && request.resource.data.from == me() && request.resource.data.to != me())
+        || ((resource.data.to == me() || resource.data.to == 'both') && resource.data.from != me()
+            && request.time >= resource.data.openAtTs
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['openedAt'])));
+      allow delete: if isCouple() && resource.data.from == me();
+    }
+    match /capsuleLetters/{capsuleId} {
+      allow read: if isCouple() && (
+        resource.data.from == me()
+        || ((resource.data.to == me() || resource.data.to == 'both')
+            && request.time >= get(/databases/$(database)/documents/capsules/$(capsuleId)).data.openAtTs));
+      allow create, update: if isCouple()
+        && request.resource.data.from == me()
+        && (resource == null || resource.data.from == me())
+        && request.resource.data.text is string && request.resource.data.text.size() <= 20000;
+      allow delete: if isCouple() && resource.data.from == me();
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();

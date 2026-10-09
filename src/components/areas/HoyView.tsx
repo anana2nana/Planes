@@ -1,6 +1,10 @@
 import { useCouple } from '../../hooks/useCouple'
 import { useRoutines, useWorkouts } from '../../hooks/useFitness'
 import { GROUPS, routineForToday, routineGroups, ymd } from '../../lib/fitness'
+import { useTrips } from '../trips/TripsView'
+import { useCapsules } from '../us/UsViews'
+import { daysToTrip, sortTrips, tripStatus } from '../../lib/trips'
+import { capsuleState } from '../../lib/us'
 import { useHome } from '../../hooks/useHome'
 import { usePet } from '../../hooks/usePet'
 import { useShopping } from '../../hooks/useShopping'
@@ -48,8 +52,15 @@ export function HoyView({ plans, me, onOpen, onToast, go }: { plans: Plan[]; me:
   const { routines } = useRoutines()
   const { workouts } = useWorkouts()
   const gym = routineForToday(routines, workouts, me, ymd(now))
+  const { items: trips } = useTrips()
+  const trip = sortTrips(trips, now).find((t) => tripStatus(t, now) === 'now' || (daysToTrip(t, now) ?? 99) <= 14)
+  const tripDays = trip ? daysToTrip(trip, now) : null
+  const { items: capsules } = useCapsules()
+  const letters = capsules.filter((c) => c.from !== me && (c.to === me || c.to === 'both') && capsuleState(c.openAt, now).open && !c.openedAt).length
 
   const cards = [
+    letters > 0 && { key: 'carta', emoji: '💝', title: letters === 1 ? 'Tienes una carta' : `Tienes ${letters} cartas`, text: 'Ya se puede abrir 💌', on: () => go('nosotros', 'capsula') },
+    trip && { key: 'viaje', emoji: '✈️', title: trip.title, text: tripStatus(trip, now) === 'now' ? '¡Estáis de viaje! Reservas y notas' : tripDays === 0 ? '¡Hoy salís!' : `En ${tripDays} ${tripDays === 1 ? 'día' : 'días'} · ¿maleta?`, on: () => go('nosotros', 'viajes') },
     gym && { key: 'gym', emoji: GROUPS[routineGroups(gym)[0] ?? 'otro'].emoji, title: 'Hoy toca', text: gym.name, on: () => go('bienestar', 'entrenos') },
     pending.length > 0 && { key: 'compra', emoji: '🛒', title: 'Compra', text: `${pending.length} ${pending.length === 1 ? 'cosa' : 'cosas'}: ${pending.slice(0, 3).map((i) => i.name).join(', ')}`, on: () => go('hogar', 'compra') },
     pay && payDays !== null && payDays <= 31 && { key: 'meroe', emoji: '🏗️', title: 'MEROE', text: `${eur(pay.amount)} ${payDays === 0 ? 'hoy' : payDays === 1 ? 'mañana' : `en ${payDays} días`}`, on: () => go('hogar', 'meroe') },

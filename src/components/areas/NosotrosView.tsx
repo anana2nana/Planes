@@ -9,6 +9,10 @@ import type { Idea } from '../../lib/ideas'
 import { PEOPLE } from '../../lib/people'
 import type { PersonId, PlaceInfo } from '../../lib/types'
 import { SpotsView, useSpots } from '../spots/SpotsView'
+import { TripsView, useTrips } from '../trips/TripsView'
+import { CapsuleView, MilestonesView, SongsView, useCapsules, useMilestones, useSongs } from '../us/UsViews'
+import { daysToTrip, sortTrips, tripDates, tripStatus } from '../../lib/trips'
+import { capsuleState } from '../../lib/us'
 import { Avatar } from '../Avatar'
 import { GiftsView } from '../GiftsView'
 import { IdeasView } from '../IdeasView'
@@ -16,11 +20,11 @@ import { DiaryView } from '../memories/DiaryView'
 import { Cover, MediaView } from '../media/MediaView'
 import { useMedia } from '../../hooks/useMedia'
 import { MEDIA_KINDS, sortMedia } from '../../lib/media'
-import { AreaTitle, SoonTile, Tile } from '../hub/Tile'
+import { AreaTitle, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-export type NosotrosSection = 'diario' | 'ideas' | 'regalos' | 'hemeroteca' | 'sitios'
-const TITLE: Record<NosotrosSection, string> = { diario: 'Diario', ideas: 'Algún día', regalos: 'Regalos', hemeroteca: 'Hemeroteca', sitios: 'Sitios' }
+export type NosotrosSection = 'diario' | 'ideas' | 'regalos' | 'hemeroteca' | 'sitios' | 'viajes' | 'musica' | 'hitos' | 'capsula'
+const TITLE: Record<NosotrosSection, string> = { diario: 'Diario', ideas: 'Algún día', regalos: 'Regalos', hemeroteca: 'Hemeroteca', sitios: 'Sitios', viajes: 'Viajes', musica: 'Banda sonora', hitos: 'Vuestra historia', capsula: 'Cápsula del tiempo' }
 
 /** Nosotros: el tiempo juntos, el diario, las ideas de planes y los regalos. */
 export function NosotrosView({
@@ -47,6 +51,10 @@ export function NosotrosView({
   if (section === 'regalos') return <GiftsView me={me} onError={onError} />
   if (section === 'hemeroteca') return <MediaView me={me} onError={onError} />
   if (section === 'sitios') return <SpotsView me={me} onError={onError} onPlan={onPlan} />
+  if (section === 'viajes') return <TripsView me={me} onError={onError} />
+  if (section === 'musica') return <SongsView me={me} onError={onError} />
+  if (section === 'hitos') return <HitosSection me={me} onError={onError} />
+  if (section === 'capsula') return <CapsuleView me={me} onError={onError} />
   return <NosotrosHub me={me} onOpen={open} onError={onError} />
 }
 
@@ -67,6 +75,14 @@ function NosotrosHub({ me, onOpen, onError }: { me: PersonId; onOpen: (s: Nosotr
   const { items: spots } = useSpots()
   const spotsWant = spots.filter((s) => s.status === 'want').length
   const spotsBeen = spots.filter((s) => s.status === 'been').length
+  const { items: trips } = useTrips()
+  const nextTrip = sortTrips(trips, now).find((t) => ['now', 'upcoming'].includes(tripStatus(t, now)))
+  const tripDays = nextTrip ? daysToTrip(nextTrip, now) : null
+  const { items: songs } = useSongs()
+  const { items: milestones } = useMilestones()
+  const { items: capsules } = useCapsules()
+  const toOpen = capsules.filter((c) => c.from !== me && (c.to === me || c.to === 'both') && capsuleState(c.openAt, now).open && !c.openedAt).length
+  const sealed = capsules.filter((c) => !capsuleState(c.openAt, now).open).length
   const covers = [...doing, ...sortMedia(media, 'done')].filter((m) => m.cover).slice(0, 4)
 
   return (
@@ -146,11 +162,40 @@ function NosotrosHub({ me, onOpen, onError }: { me: PersonId; onOpen: (s: Nosotr
               'Ideas secretas para tu pareja'
             )}
           </Tile>
-          <SoonTile emoji="✈️" title="Viajes">
-            Fechas, reservas, maleta y presupuesto
-          </SoonTile>
+          <Tile emoji="✈️" title="Viajes" onClick={() => onOpen('viajes')} muted={trips.length === 0}>
+            {nextTrip ? (
+              <>
+                <b className="text-ink">{nextTrip.title}</b>
+                <span className="block">{tripStatus(nextTrip, now) === 'now' ? '¡de viaje!' : tripDays === 0 ? '¡hoy!' : `en ${tripDays} ${tripDays === 1 ? 'día' : 'días'} · ${tripDates(nextTrip)}`}</span>
+              </>
+            ) : trips.length ? (
+              `${trips.length} ${trips.length === 1 ? 'viaje' : 'viajes'} · el mapa de dónde habéis estado`
+            ) : (
+              'Fechas, reservas, maleta y presupuesto'
+            )}
+          </Tile>
+        </div>
+      </section>
+
+      <section>
+        <AreaTitle>Vuestra historia</AreaTitle>
+        <div className="grid grid-cols-2 gap-3">
+          <Tile emoji="📍" title="Hitos" onClick={() => onOpen('hitos')} muted={milestones.length === 0}>
+            {milestones.length === 0 ? 'La línea del tiempo de lo vuestro' : `${milestones.length} ${milestones.length === 1 ? 'momento' : 'momentos'}`}
+          </Tile>
+          <Tile emoji="🎵" title="Banda sonora" onClick={() => onOpen('musica')} muted={songs.length === 0}>
+            {songs.length === 0 ? 'Vuestras canciones y su historia' : `${songs.length} ${songs.length === 1 ? 'canción' : 'canciones'}`}
+          </Tile>
+          <Tile emoji="💌" title="Cápsula del tiempo" onClick={() => onOpen('capsula')} wide muted={capsules.length === 0}>
+            {toOpen > 0 ? <b className="text-rose-600">💝 Tienes {toOpen === 1 ? 'una carta' : `${toOpen} cartas`} para abrir</b> : capsules.length === 0 ? 'Cartas que solo se pueden abrir en una fecha' : `${sealed} ${sealed === 1 ? 'carta cerrada' : 'cartas cerradas'}`}
+          </Tile>
         </div>
       </section>
     </div>
   )
+}
+
+function HitosSection({ me, onError }: { me: PersonId; onError: (m: string) => void }) {
+  const { since } = useCouple()
+  return <MilestonesView me={me} since={since} onError={onError} />
 }
