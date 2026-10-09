@@ -31,3 +31,15 @@ export async function compressImage(file: Blob, maxSide = 1400): Promise<{ dataU
   bitmap.close()
   throw new Error('La foto es demasiado grande')
 }
+
+/** Recorta el centro de una foto en cuadrado y la reduce (para la foto de perfil). */
+export async function squarePhoto(file: Blob, side = 256): Promise<string> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const s = Math.min(bitmap.width, bitmap.height)
+  const canvas = document.createElement('canvas')
+  canvas.width = side
+  canvas.height = side
+  canvas.getContext('2d')!.drawImage(bitmap, (bitmap.width - s) / 2, (bitmap.height - s) / 2, s, s, 0, 0, side, side)
+  bitmap.close()
+  return canvas.toDataURL('image/jpeg', 0.8)
+}

@@ -13,6 +13,8 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { CalendarSection } from './CalendarSection'
 import { saveBirthday, saveCoupleSince, useCouple } from '../hooks/useCouple'
 import { BirthdayInput } from './BirthdayInput'
+import { saveProfilePhoto, useProfilePhotos } from '../hooks/useProfiles'
+import { squarePhoto } from '../lib/image'
 import { daysTogether } from '../lib/couple'
 
 interface Props {
@@ -30,6 +32,19 @@ export function SettingsView({ user, me, tags, plans, priorities, onError }: Pro
 
   return (
     <div className="space-y-8">
+      <Section title="Tú">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <ProfilePhoto me={me} onError={onError} />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">{PEOPLE[me].name}</p>
+            <p className="truncate text-sm text-muted">{user.email}</p>
+          </div>
+          <button onClick={logout} className="flex items-center gap-1.5 rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold active:scale-95">
+            <LogoutIcon className="size-4" /> Salir
+          </button>
+        </div>
+      </Section>
+
       <Section title="Notificaciones" hint="Cada uno las suyas">
         <ErrorBoundary inline>
           <NotificationsSection me={me} onError={onError} />
@@ -75,18 +90,6 @@ export function SettingsView({ user, me, tags, plans, priorities, onError }: Pro
         <NewTagRow onCreate={(name, color) => saveTag({ name, color }).committed.catch(fail)} />
       </Section>
 
-      <Section title="Cuenta">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Avatar mode={me} size="md" />
-          <div className="min-w-0 flex-1">
-            <p className="font-bold">{PEOPLE[me].name}</p>
-            <p className="truncate text-sm text-muted">{user.email}</p>
-          </div>
-          <button onClick={logout} className="flex items-center gap-1.5 rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold active:scale-95">
-            <LogoutIcon className="size-4" /> Salir
-          </button>
-        </div>
-      </Section>
     </div>
   )
 }
@@ -277,6 +280,39 @@ function BirthdayRow({ person, onError }: { person: PersonId; onError: (msg: str
         <span className="text-xs text-muted">Para avisar de los regalos</span>
       </span>
       <BirthdayInput value={birthdays[person]} onChange={(v) => saveBirthday(person, v).catch((e: Error) => onError(e.message))} label={`Cumple de ${PEOPLE[person].name}`} />
+    </div>
+  )
+}
+
+/** Tu foto de perfil: tocar para cambiarla (la ven los dos en toda la app). */
+function ProfilePhoto({ me, onError }: { me: PersonId; onError: (msg: string) => void }) {
+  const photos = useProfilePhotos()
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-1">
+      <label className="relative cursor-pointer" aria-label="Cambiar foto de perfil">
+        <Avatar mode={me} size="xl" />
+        <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-surface text-sm shadow" aria-hidden>
+          📷
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (!f) return
+            squarePhoto(f)
+              .then((url) => saveProfilePhoto(me, url))
+              .catch((err: Error) => onError(err.message))
+          }}
+        />
+      </label>
+      {photos[me] && (
+        <button onClick={() => saveProfilePhoto(me, null).catch((err: Error) => onError(err.message))} className="text-[11px] font-semibold text-muted">
+          Quitar
+        </button>
+      )}
     </div>
   )
 }

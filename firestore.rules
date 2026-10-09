@@ -175,6 +175,13 @@ service cloud.firestore {
         && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
     }
 
+    // Foto de perfil: la ven los dos; cada uno cambia la suya.
+    match /profiles/{person} {
+      allow read: if isCouple();
+      allow write: if isCouple() && person == me()
+        && (request.resource == null || request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() < 200000));
+    }
+
     // Contraseña de regalos de cada uno: solo la sal y una comprobación (nunca la clave).
     match /giftKeys/{person} {
       allow read, write: if isCouple() && person == me();
