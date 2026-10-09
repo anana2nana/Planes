@@ -11,11 +11,13 @@ import { HomeView } from '../home/HomeView'
 import { NotesView } from '../home/NotesView'
 import { PetView } from '../home/PetView'
 import { ShoppingView } from '../ShoppingView'
+import { PapersView, paperDays, usePapers } from '../papers/PapersView'
+import { expiryLevel } from '../../lib/due'
 import { AreaTitle, SoonTile, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-type Section = 'meroe' | 'compra' | 'gata' | 'notas'
-const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa' }
+type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles'
+const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles' }
 
 /** Hogar: la casa (MEROE), la compra, la gata y las notas. Cada cosa es un espacio. */
 export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void }) {
@@ -31,6 +33,7 @@ export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m:
   if (section === 'compra') return <ShoppingView me={me} onToast={onError} />
   if (section === 'gata') return <PetView onError={onError} />
   if (section === 'notas') return <NotesView me={me} onError={onError} onToast={onError} />
+  if (section === 'papeles') return <PapersView me={me} onError={onError} />
   return <HogarHub onOpen={open} />
 }
 
@@ -44,6 +47,8 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
   const pending = shopping.filter((i) => !i.done)
   const due = care.filter((c) => c.last).map((c) => ({ c, days: daysUntil(nextDue(c, today), today) })).sort((a, b) => a.days - b.days)
   const late = due.filter((d) => d.days <= 0)
+  const { items: papers } = usePapers()
+  const expiring = papers.filter((p) => ['soon', 'urgent', 'expired'].includes(expiryLevel(paperDays(p)))).sort((a, b) => (a.expires ?? '').localeCompare(b.expires ?? ''))
 
   return (
     <div className="space-y-5">
@@ -70,6 +75,15 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
                 <b className="text-ink">{pending.length}</b> {pending.length === 1 ? 'cosa' : 'cosas'}
                 <span className="block truncate">{pending.slice(0, 3).map((i) => i.name).join(' · ')}</span>
               </>
+            )}
+          </Tile>
+          <Tile emoji="🧾" title="Garantías y documentos" onClick={() => onOpen('papeles')} muted={papers.length === 0}>
+            {expiring.length > 0 ? (
+              <b className="text-rose-600">{expiring.length === 1 ? `Caduca pronto: ${expiring[0].title}` : `${expiring.length} caducan pronto`}</b>
+            ) : papers.length === 0 ? (
+              'Tickets, DNI, seguros… y aviso antes de que caduquen'
+            ) : (
+              `${papers.length} guardados · todo al día`
             )}
           </Tile>
           <Tile emoji="📝" title="Notas" onClick={() => onOpen('notas')} muted={notes.length === 0}>

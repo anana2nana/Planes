@@ -237,7 +237,7 @@ function Home({ user, me }: { user: User; me: PersonId }) {
         ) : tab === 'bienestar' ? (
           <BienestarView me={me} onError={setToast} onTitle={setAreaTitle} />
         ) : tab === 'nosotros' ? (
-          <NosotrosView me={me} onError={setToast} onTitle={setAreaTitle} onMakePlan={(idea) => openSheet({ mode: 'new', kind: 'plan', idea })} />
+          <NosotrosView me={me} onError={setToast} onTitle={setAreaTitle} onMakePlan={(idea) => openSheet({ mode: 'new', kind: 'plan', idea })} onPlan={(prefill) => openSheet({ mode: 'new', kind: 'plan', prefill })} />
         ) : (
           <SettingsView user={user} me={me} tags={tags} plans={plans} priorities={priorities} onError={setToast} />
         )}

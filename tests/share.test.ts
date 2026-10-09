@@ -8,7 +8,7 @@ test('compartir desde Google Maps: nombre, dirección y enlace', () => {
   assert.equal(s.detail, 'Calle de la Cava Baja, 35, 28005 Madrid')
   assert.equal(s.link, 'https://maps.app.goo.gl/AbC123')
   assert.equal(s.isMaps, true)
-  assert.equal(s.suggested, 'idea')
+  assert.equal(s.suggested, 'spot')
   // Otra forma: título aparte y solo el enlace en el texto.
   const t = parseShared({ title: 'Museo del Prado', text: 'https://maps.app.goo.gl/xyz', url: null })
   assert.equal(t.name, 'Museo del Prado')

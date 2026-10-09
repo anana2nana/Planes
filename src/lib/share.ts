@@ -1,6 +1,8 @@
 // "Compartir con Nitakitos": entender lo que llega desde otra app (Google Maps, una tienda, una lista…).
 
-export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe'
+import { isMediaLink } from './media.ts'
+
+export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe' | 'media' | 'spot'
 
 export interface Shared {
   /** Nombre o título principal (sin enlaces). */
@@ -39,8 +41,10 @@ export function parseShared(p: { title?: string | null; text?: string | null; ur
   const name = lines[0] ?? ''
   const detail = lines[1] ?? ''
 
-  let suggested: ShareTarget = 'idea'
+  // Desde Google Maps, lo normal es guardarlo en Sitios.
+  let suggested: ShareTarget = isMaps ? 'spot' : 'idea'
   if (link && SHOP_RE.test(link)) suggested = 'gift'
+  else if (link && isMediaLink(link)) suggested = 'media'
   else if ((link && VIDEO_RE.test(link)) || /\breceta/i.test(all)) suggested = 'recipe'
   else if (!link && lines.length >= 2 && lines.every((l) => l.length <= 40)) suggested = 'shopping'
   else if (!link && name.length > 60) suggested = 'note'

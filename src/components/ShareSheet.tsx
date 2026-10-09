@@ -11,11 +11,17 @@ import { addShoppingItem } from '../services/shopping'
 import { BottomSheet } from './BottomSheet'
 import { GiftForm, emptyGift, hostOf } from './GiftsView'
 import { RecipeEditor, emptyRecipe } from './food/RecipeEditor'
+import { MediaSheet, emptyMedia } from './media/MediaView'
+import { SpotSheet, emptySpot } from './spots/SpotsView'
+import { guessSpotKind } from '../lib/spots'
+import { mediaFromShare } from '../lib/media'
 
 const TARGETS: { id: ShareTarget; label: string }[] = [
+  { id: 'spot', label: '📍 Sitios' },
   { id: 'idea', label: '💡 Algún día' },
   { id: 'plan', label: '📅 Plan con fecha' },
   { id: 'recipe', label: '🍝 Receta' },
+  { id: 'media', label: '🎬 Hemeroteca' },
   { id: 'gift', label: '🎁 Regalo' },
   { id: 'shopping', label: '🛒 Compra' },
   { id: 'note', label: '📝 Nota' },
@@ -43,6 +49,8 @@ export function ShareSheet({
   const [finding, setFinding] = useState(shared.isMaps)
   const [gift, setGift] = useState(false)
   const [recipe, setRecipe] = useState(false)
+  const [media, setMedia] = useState(false)
+  const [spot, setSpot] = useState(false)
   const { items } = useShopping()
   const fail = (e: Error) => onToast(e.message)
 
@@ -66,6 +74,22 @@ export function ShareSheet({
   if (gift)
     return <GiftForm draft={emptyGift({ title, url: shared.link })} me={me} partner={partner} onClose={onClose} onError={onToast} onSaved={() => onToast('🎁 Guardado en Planes → Regalos (solo lo ves tú)')} />
 
+  if (spot)
+    return (
+      <SpotSheet
+        draft={emptySpot({ name: title.trim(), place, kind: guessSpotKind(title), link: shared.isMaps ? '' : shared.link })}
+        me={me}
+        onClose={onClose}
+        onSaved={() => onToast('📍 Guardado en Nosotros → Sitios')}
+        onError={onToast}
+      />
+    )
+
+  if (media) {
+    const m = mediaFromShare([shared.name, ...shared.lines.slice(1)].join('\n'), shared.link)
+    return <MediaSheet draft={emptyMedia({ ...m, title: title.trim() === shared.name ? m.title : title.trim() })} me={me} onClose={onClose} onSaved={() => onToast('🎬 Guardado en Nosotros → Hemeroteca')} onError={onToast} />
+  }
+
   if (recipe)
     return (
       <RecipeEditor
@@ -81,6 +105,8 @@ export function ShareSheet({
     const t = title.trim()
     if (target === 'gift') return setGift(true)
     if (target === 'recipe') return setRecipe(true)
+    if (target === 'media') return setMedia(true)
+    if (target === 'spot') return setSpot(true)
     if (target === 'plan') {
       onMakePlan({ title: t, place, notes: linkNote })
       return
@@ -108,7 +134,7 @@ export function ShareSheet({
       title="Guardar en Nitakitos"
       footer={
         <button onClick={save} disabled={!canSave} className="h-13 w-full rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
-          {target === 'gift' || target === 'plan' || target === 'recipe' ? 'Seguir' : 'Guardar'}
+          {target === 'gift' || target === 'plan' || target === 'recipe' || target === 'media' || target === 'spot' ? 'Seguir' : 'Guardar'}
         </button>
       }
     >
@@ -165,7 +191,7 @@ export function ShareSheet({
           </div>
         )}
 
-        {(target === 'idea' || target === 'plan') && shared.isMaps && (
+        {(target === 'idea' || target === 'plan' || target === 'spot') && shared.isMaps && (
           <p className="rounded-2xl bg-sky-50 px-3 py-2.5 text-sm font-semibold text-sky-700">
             {finding ? '📍 Buscando el sitio en Google Maps…' : place ? `📍 ${place.name} · ${place.address}` : '📍 No he encontrado el sitio: se guarda el enlace.'}
           </p>

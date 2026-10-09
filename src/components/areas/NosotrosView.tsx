@@ -7,19 +7,36 @@ import { nextAnniversary, togetherBreakdown, togetherText } from '../../lib/coup
 import { OCCASIONS, upcomingOccasions } from '../../lib/gifts'
 import type { Idea } from '../../lib/ideas'
 import { PEOPLE } from '../../lib/people'
-import type { PersonId } from '../../lib/types'
+import type { PersonId, PlaceInfo } from '../../lib/types'
+import { SpotsView, useSpots } from '../spots/SpotsView'
 import { Avatar } from '../Avatar'
 import { GiftsView } from '../GiftsView'
 import { IdeasView } from '../IdeasView'
 import { DiaryView } from '../memories/DiaryView'
+import { Cover, MediaView } from '../media/MediaView'
+import { useMedia } from '../../hooks/useMedia'
+import { MEDIA_KINDS, sortMedia } from '../../lib/media'
 import { AreaTitle, SoonTile, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-export type NosotrosSection = 'diario' | 'ideas' | 'regalos'
-const TITLE: Record<NosotrosSection, string> = { diario: 'Diario', ideas: 'Algún día', regalos: 'Regalos' }
+export type NosotrosSection = 'diario' | 'ideas' | 'regalos' | 'hemeroteca' | 'sitios'
+const TITLE: Record<NosotrosSection, string> = { diario: 'Diario', ideas: 'Algún día', regalos: 'Regalos', hemeroteca: 'Hemeroteca', sitios: 'Sitios' }
 
 /** Nosotros: el tiempo juntos, el diario, las ideas de planes y los regalos. */
-export function NosotrosView({ me, onError, onTitle, onMakePlan }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void; onMakePlan: (i: Idea) => void }) {
+export function NosotrosView({
+  me,
+  onError,
+  onTitle,
+  onMakePlan,
+  onPlan,
+}: {
+  me: PersonId
+  onError: (m: string) => void
+  onTitle: (t: AreaTitleInfo | null) => void
+  onMakePlan: (i: Idea) => void
+  /** Abrir el formulario de un plan ya relleno (desde un sitio, un viaje…). */
+  onPlan: (p: { title: string; place: PlaceInfo | null; notes: string }) => void
+}) {
   const [section, open] = useSection<NosotrosSection>('nosotros')
   useEffect(() => {
     onTitle(section ? { title: TITLE[section], crumb: 'Nosotros' } : null)
@@ -28,6 +45,8 @@ export function NosotrosView({ me, onError, onTitle, onMakePlan }: { me: PersonI
   if (section === 'diario') return <DiaryView me={me} onError={onError} />
   if (section === 'ideas') return <IdeasView me={me} onMakePlan={onMakePlan} onError={onError} />
   if (section === 'regalos') return <GiftsView me={me} onError={onError} />
+  if (section === 'hemeroteca') return <MediaView me={me} onError={onError} />
+  if (section === 'sitios') return <SpotsView me={me} onError={onError} onPlan={onPlan} />
   return <NosotrosHub me={me} onOpen={open} onError={onError} />
 }
 
@@ -41,6 +60,14 @@ function NosotrosHub({ me, onOpen, onError }: { me: PersonId; onOpen: (s: Nosotr
   const lastMemory = [...memories].sort((a, b) => b.date.localeCompare(a.date))[0]
   const nextOccasion = upcomingOccasions(birthdays[partner], since, now)[0]
   const anniv = since ? nextAnniversary(since, now) : null
+  const { items: media } = useMedia()
+  const doing = sortMedia(media, 'doing')
+  const want = media.filter((m) => m.status === 'want').length
+  const seen = media.filter((m) => m.status === 'done').length
+  const { items: spots } = useSpots()
+  const spotsWant = spots.filter((s) => s.status === 'want').length
+  const spotsBeen = spots.filter((s) => s.status === 'been').length
+  const covers = [...doing, ...sortMedia(media, 'done')].filter((m) => m.cover).slice(0, 4)
 
   return (
     <div className="space-y-5">
@@ -83,6 +110,29 @@ function NosotrosHub({ me, onOpen, onError }: { me: PersonId; onOpen: (s: Nosotr
               <p className="text-xs text-muted">{memories.length === 0 ? 'Fotos y frases de lo que hacéis juntos' : `${memories.length} ${memories.length === 1 ? 'recuerdo' : 'recuerdos'} · el último: ${lastMemory.title}`}</p>
             </div>
           </button>
+          <button onClick={() => onOpen('hemeroteca')} className="col-span-2 flex items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)] active:scale-[0.99]">
+            <span className="min-w-0 flex-1">
+              <span className="block font-extrabold">🎬 Hemeroteca</span>
+              <span className="block text-xs text-muted">
+                {media.length === 0
+                  ? 'Pelis, series y libros: lo pendiente y lo que habéis visto juntos'
+                  : doing.length
+                    ? `${MEDIA_KINDS[doing[0].kind].doing}: ${doing[0].title}${doing[0].progress ? ` (${doing[0].progress})` : ''}`
+                    : `${seen} ${seen === 1 ? 'vista' : 'vistas'} · ${want} ${want === 1 ? 'pendiente' : 'pendientes'}`}
+              </span>
+              {media.length > 0 && doing.length > 0 && <span className="block text-xs text-muted">{seen} {seen === 1 ? 'vista' : 'vistas'} · {want} {want === 1 ? 'pendiente' : 'pendientes'}</span>}
+            </span>
+            {covers.length > 0 && (
+              <span className="flex shrink-0 -space-x-4">
+                {covers.map((m) => (
+                  <Cover key={m.id} m={m} className="!w-11 rounded-lg ring-2 ring-surface" />
+                ))}
+              </span>
+            )}
+          </button>
+          <Tile emoji="📍" title="Sitios" onClick={() => onOpen('sitios')} muted={spots.length === 0}>
+            {spots.length === 0 ? 'Restaurantes y planes: los de siempre y los pendientes' : `${spotsWant} por probar · ${spotsBeen} ya probados`}
+          </Tile>
           <Tile emoji="💡" title="Algún día" onClick={() => onOpen('ideas')} muted={pendingIdeas === 0}>
             {pendingIdeas === 0 ? 'Ideas de planes sin fecha' : `${pendingIdeas} ${pendingIdeas === 1 ? 'idea' : 'ideas'} · 🎲 ¿qué hacemos hoy?`}
           </Tile>

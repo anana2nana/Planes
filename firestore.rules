@@ -216,6 +216,34 @@ service cloud.firestore {
         && request.resource.data.date is string;
     }
 
+    // Hemeroteca: pelis, series, libros… (la portada puede ser una foto pequeña).
+    match /media/{mediaId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && (request.resource.data.cover == null || (request.resource.data.cover is string && request.resource.data.cover.size() < 300000));
+    }
+    // Sitios: restaurantes y planes.
+    match /spots/{spotId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80;
+    }
+    // Garantías, documentos, seguros… y su foto (aparte, para que la lista pese poco).
+    match /papers/{paperId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+    }
+    match /paperPhotos/{paperId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
+    }
+
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();
