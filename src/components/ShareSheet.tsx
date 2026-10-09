@@ -15,6 +15,8 @@ import { MediaSheet, emptyMedia } from './media/MediaView'
 import { SpotSheet, emptySpot } from './spots/SpotsView'
 import { guessSpotKind } from '../lib/spots'
 import { mediaFromShare } from '../lib/media'
+import { RouteSheet } from './routes/RoutesView'
+import { emptyRoute } from './routes/useRoutes'
 
 const TARGETS: { id: ShareTarget; label: string }[] = [
   { id: 'spot', label: '📍 Sitios' },
@@ -22,6 +24,7 @@ const TARGETS: { id: ShareTarget; label: string }[] = [
   { id: 'plan', label: '📅 Plan con fecha' },
   { id: 'recipe', label: '🍝 Receta' },
   { id: 'media', label: '🎬 Hemeroteca' },
+  { id: 'route', label: '🥾 Ruta' },
   { id: 'gift', label: '🎁 Regalo' },
   { id: 'shopping', label: '🛒 Compra' },
   { id: 'note', label: '📝 Nota' },
@@ -51,6 +54,7 @@ export function ShareSheet({
   const [recipe, setRecipe] = useState(false)
   const [media, setMedia] = useState(false)
   const [spot, setSpot] = useState(false)
+  const [route, setRoute] = useState(false)
   const { items } = useShopping()
   const fail = (e: Error) => onToast(e.message)
 
@@ -85,6 +89,17 @@ export function ShareSheet({
       />
     )
 
+  if (route)
+    return (
+      <RouteSheet
+        draft={emptyRoute({ title: title.trim().replace(/\s*[|·–-]\s*(Wikiloc|AllTrails|Komoot|Outdooractive|Strava)\b.*$/i, '').slice(0, 100), link: shared.link, place: shared.isMaps ? place : null })}
+        me={me}
+        onClose={onClose}
+        onSaved={() => onToast('🥾 Guardada en Bienestar → Rutas (por hacer)')}
+        onError={onToast}
+      />
+    )
+
   if (media) {
     const m = mediaFromShare([shared.name, ...shared.lines.slice(1)].join('\n'), shared.link)
     return <MediaSheet draft={emptyMedia({ ...m, title: title.trim() === shared.name ? m.title : title.trim() })} me={me} onClose={onClose} onSaved={() => onToast('🎬 Guardado en Nosotros → Hemeroteca')} onError={onToast} />
@@ -107,6 +122,7 @@ export function ShareSheet({
     if (target === 'recipe') return setRecipe(true)
     if (target === 'media') return setMedia(true)
     if (target === 'spot') return setSpot(true)
+    if (target === 'route') return setRoute(true)
     if (target === 'plan') {
       onMakePlan({ title: t, place, notes: linkNote })
       return
@@ -134,7 +150,7 @@ export function ShareSheet({
       title="Guardar en Nitakitos"
       footer={
         <button onClick={save} disabled={!canSave} className="h-13 w-full rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
-          {target === 'gift' || target === 'plan' || target === 'recipe' || target === 'media' || target === 'spot' ? 'Seguir' : 'Guardar'}
+          {target === 'gift' || target === 'plan' || target === 'recipe' || target === 'media' || target === 'spot' || target === 'route' ? 'Seguir' : 'Guardar'}
         </button>
       }
     >

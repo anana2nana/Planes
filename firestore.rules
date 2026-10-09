@@ -231,6 +231,14 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80;
     }
+    // Rutas (paseos y senderismo): hechas o por hacer, con el camino como polilínea.
+    match /routes/{routeId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+        && (!('polyline' in request.resource.data) || (request.resource.data.polyline is string && request.resource.data.polyline.size() < 200000));
+    }
     // Garantías, documentos, seguros… y su foto (aparte, para que la lista pese poco).
     match /papers/{paperId} {
       allow read, delete: if isCouple();

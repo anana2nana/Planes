@@ -1,8 +1,9 @@
 // "Compartir con Nitakitos": entender lo que llega desde otra app (Google Maps, una tienda, una lista…).
 
 import { isMediaLink } from './media.ts'
+import { isRouteLink } from './geo.ts'
 
-export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe' | 'media' | 'spot'
+export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe' | 'media' | 'spot' | 'route'
 
 export interface Shared {
   /** Nombre o título principal (sin enlaces). */
@@ -45,6 +46,7 @@ export function parseShared(p: { title?: string | null; text?: string | null; ur
   let suggested: ShareTarget = isMaps ? 'spot' : 'idea'
   if (link && SHOP_RE.test(link)) suggested = 'gift'
   else if (link && isMediaLink(link)) suggested = 'media'
+  else if (link && isRouteLink(link)) suggested = 'route'
   else if ((link && VIDEO_RE.test(link)) || /\breceta/i.test(all)) suggested = 'recipe'
   else if (!link && lines.length >= 2 && lines.every((l) => l.length <= 40)) suggested = 'shopping'
   else if (!link && name.length > 60) suggested = 'note'

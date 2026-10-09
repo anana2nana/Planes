@@ -15,11 +15,14 @@ import type { Plan } from '../../lib/types'
 import { useBodyLogs, useRoutines, useWorkouts } from '../../hooks/useFitness'
 import { routineForToday, streak, weightTrend } from '../../lib/fitness'
 import { RecipesView } from '../food/RecipesView'
+import { RoutesView } from '../routes/RoutesView'
+import { routeTotals, useRoutes } from '../routes/useRoutes'
+import { kmFmt } from '../../lib/geo'
 import { AreaTitle, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-export type BienestarSection = 'menu' | 'recetas' | 'nutricion' | 'entrenos' | 'peso' | 'medico'
-const TITLE: Record<BienestarSection, string> = { menu: 'Menú de la semana', recetas: 'Recetas', nutricion: 'Nutrición', entrenos: 'Entrenos', peso: 'Peso y medidas', medico: 'Médico' }
+export type BienestarSection = 'menu' | 'recetas' | 'nutricion' | 'entrenos' | 'rutas' | 'peso' | 'medico'
+const TITLE: Record<BienestarSection, string> = { menu: 'Menú de la semana', recetas: 'Recetas', nutricion: 'Nutrición', entrenos: 'Entrenos', rutas: 'Rutas', peso: 'Peso y medidas', medico: 'Médico' }
 
 /** Bienestar: lo que coméis (menú y recetas) y, pronto, entrenos, peso y nutrición. */
 export function BienestarView({ me, onError, onTitle, plans = [], onOpenPlan }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void; plans?: Plan[]; onOpenPlan?: (p: Plan) => void }) {
@@ -32,6 +35,7 @@ export function BienestarView({ me, onError, onTitle, plans = [], onOpenPlan }: 
   if (section === 'recetas') return <RecipesView me={me} onError={onError} />
   if (section === 'nutricion') return <NutritionView me={me} onError={onError} />
   if (section === 'entrenos') return <TrainingView me={me} onError={onError} />
+  if (section === 'rutas') return <RoutesView me={me} onError={onError} />
   if (section === 'peso') return <BodyView me={me} onError={onError} />
   if (section === 'medico') return <HealthView me={me} onError={onError} plans={plans} onOpenPlan={onOpenPlan} />
   return <BienestarHub me={me} onOpen={open} plans={plans} />
@@ -55,6 +59,8 @@ function BienestarHub({ me, onOpen, plans }: { me: PersonId; onOpen: (s: Bienest
   const { logs } = useBodyLogs(me)
   const trend = weightTrend(logs, today)
   const { items: health } = useHealth(me)
+  const { items: routes } = useRoutes()
+  const rt = routeTotals(routes, today)
   const nextHealth = health
     .map((h) => ({ h, d: upcomingDate(h, today) }))
     .filter((x): x is { h: (typeof health)[number]; d: string } => x.d !== null)
@@ -121,6 +127,22 @@ function BienestarHub({ me, onOpen, plans }: { me: PersonId; onOpen: (s: Bienest
               </span>
             )}
             {st.weeks > 1 && <span className="block">🔥 {st.weeks} semanas seguidas</span>}
+          </Tile>
+          <Tile emoji="🥾" title="Rutas" onClick={() => onOpen('rutas')} wide muted={routes.length === 0}>
+            {routes.length === 0 ? (
+              'Paseos y senderismo con el GPS del móvil, en el mapa (y las que queréis hacer)'
+            ) : (
+              <>
+                {rt.monthCount > 0 ? (
+                  <>
+                    Este mes: <b className="text-ink">{kmFmt(rt.monthKm)}</b> en {rt.monthCount} {rt.monthCount === 1 ? 'ruta' : 'rutas'}
+                  </>
+                ) : (
+                  `${kmFmt(rt.totalKm)} andados en total`
+                )}
+                {rt.wantCount > 0 && <span className="block">{rt.wantCount} por hacer</span>}
+              </>
+            )}
           </Tile>
           <Tile emoji="⚖️" title="Peso y medidas" onClick={() => onOpen('peso')} muted={!trend.last}>
             {trend.last ? (

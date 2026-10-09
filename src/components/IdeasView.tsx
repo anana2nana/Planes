@@ -5,6 +5,7 @@ import { IDEA_CATEGORIES, IDEA_ORDER, IDEA_OWN, MOVED_TO, pickRandom, type Idea,
 import { useMedia } from '../hooks/useMedia'
 import { useSpots } from './spots/SpotsView'
 import { useTrips } from './trips/TripsView'
+import { startPlace, useRoutes } from './routes/useRoutes'
 import type { PlaceInfo } from '../lib/types'
 import type { PersonId } from '../lib/types'
 import { deleteIdea, saveIdea, setIdeaDone } from '../services/ideas'
@@ -51,10 +52,12 @@ export function IdeasView({
   const { items: spots } = useSpots()
   const { items: media } = useMedia()
   const { items: trips } = useTrips()
+  const { items: routes } = useRoutes()
   const others: PoolItem[] = [
     ...spots.filter((x) => x.status === 'want').map((x) => ({ id: `spot-${x.id}`, title: x.name, category: 'comer' as const, place: x.place, notes: [x.cuisine, x.notes].filter(Boolean).join(' · '), idea: null })),
     ...media.filter((x) => x.status === 'want' && ['peli', 'serie', 'docu'].includes(x.kind)).map((x) => ({ id: `media-${x.id}`, title: x.title, category: 'peli' as const, place: null, notes: x.where, idea: null })),
     ...trips.filter((x) => !x.start).map((x) => ({ id: `trip-${x.id}`, title: x.title, category: 'escapada' as const, place: x.destination, notes: x.notes, idea: null })),
+    ...routes.filter((x) => x.status === 'want').map((x) => ({ id: `route-${x.id}`, title: `🥾 ${x.title}`, category: 'plan' as const, place: startPlace(x), notes: [x.link, x.notes].filter(Boolean).join(' · '), idea: null })),
   ]
   const pool: PoolItem[] = [...pending.map((i) => ({ ...i, idea: i })), ...others.filter((o) => !filter || o.category === filter)]
   const counts = { comer: others.filter((o) => o.category === 'comer').length, peli: others.filter((o) => o.category === 'peli').length, escapada: others.filter((o) => o.category === 'escapada').length }
@@ -110,7 +113,7 @@ export function IdeasView({
             </div>
           ) : (
             <p className="pt-3 text-sm opacity-90">
-              {pool.length === 0 ? 'Añadid ideas y la ruleta elegirá por vosotros.' : `Entre ${pool.length} ${pool.length === 1 ? 'opción' : 'opciones'}${filter ? ` de ${IDEA_CATEGORIES[filter].label.toLowerCase()}` : ''} (también de Sitios, la Hemeroteca y Viajes)`}
+              {pool.length === 0 ? 'Añadid ideas y la ruleta elegirá por vosotros.' : `Entre ${pool.length} ${pool.length === 1 ? 'opción' : 'opciones'}${filter ? ` de ${IDEA_CATEGORIES[filter].label.toLowerCase()}` : ''} (también de Sitios, la Hemeroteca, Viajes y Rutas)`}
             </p>
           )}
         </div>

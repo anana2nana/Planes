@@ -23,6 +23,7 @@ App web móvil, privada y colaborativa en tiempo real para gestionar nuestros pl
 - **✈️ Viajes** (Nosotros): reservas con localizador, maleta reutilizable, presupuesto y mapa de dónde habéis estado.
 - **📍 Hitos, 🎵 banda sonora y 💌 cápsula del tiempo** (Nosotros): vuestra historia, vuestras canciones y cartas que no se pueden abrir hasta su fecha.
 - **🧾 Papeles, 🧰 mantenimiento, 🚗 coche y 💳 suscripciones** (Hogar): garantías y documentos que caducan, lo que toca cada cierto tiempo y cuánto suman los cobros, con avisos.
+- **🥾 Rutas** (Bienestar): grabar paseos y senderismo con el GPS del móvil (pantalla encendida y «modo bolsillo»), verlos en el mapa con distancia, desnivel, tiempo y perfil de altitud; importar GPX (Wikiloc, AllTrails, relojes) y guardar rutas por hacer.
 - **🩺 Médico** (Bienestar): ficha, citas, vacunas y medicación de cada uno (privado).
 - **🛒 Lista de la compra** compartida en tiempo real, por secciones, con "lo de siempre" (aprende lo que compráis).
 - **☀️ Resumen del día**: cada mañana, a la hora que elija cada uno, un aviso con lo de hoy; y la franja "Hoy para ti" en la Agenda.
