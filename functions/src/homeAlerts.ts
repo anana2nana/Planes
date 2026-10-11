@@ -86,10 +86,18 @@ export function petPushes(care: CareItem[], petName: string, prefs: Record<Perso
   if (due.length === 0) return []
   const name = petName.trim() || 'la gata'
   const late = due.filter((c) => daysUntil(nextDue(c, today), today) <= 0)
-  const title = late.length === due.length ? `🐱 Pendiente con ${name}` : `🐱 Mañana toca con ${name}`
-  const body = due.map((c) => `${c.title}${late.includes(c) ? ' (pendiente)' : ''}`).join('\n')
+  // Cada uno recibe solo lo que le toca a él (o a los dos).
   const people: Person[] = ['nita', 'kitos']
-  return people.filter((p) => prefs[p].home).map((p) => ({ to: p, kind: 'reminder' as const, title, body: `${body}\nMárcalo en Casa → ${name} cuando esté hecho.`, tag: 'pet-care' }))
+  return people
+    .filter((p) => prefs[p].home)
+    .map((p): Push | null => {
+      const mine = due.filter((c) => (c.who ?? 'both') === 'both' || c.who === p)
+      if (!mine.length) return null
+      const allLate = mine.every((c) => late.includes(c))
+      const body = mine.map((c) => `${c.title}${late.includes(c) ? ' (pendiente)' : ''}${c.who === p ? ' · te toca a ti' : ''}`).join('\n')
+      return { to: p, kind: 'reminder' as const, title: allLate ? `🐱 Pendiente con ${name}` : `🐱 Mañana toca con ${name}`, body: `${body}\nMárcalo en Hogar → ${name} cuando esté hecho.`, tag: 'pet-care' }
+    })
+    .filter((x): x is Push => x !== null)
 }
 
 /** Lo mínimo de cada idea de regalo para avisar (sin títulos: el aviso puede verse en la pantalla bloqueada). */

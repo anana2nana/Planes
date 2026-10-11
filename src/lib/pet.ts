@@ -11,10 +11,25 @@ export interface CareItem {
   last: string | null
   /** Fechas anteriores (las más recientes al final). */
   history: string[]
+  /** A quién le toca (sin dato = a los dos). */
+  who?: CareWho
+  /** Por turnos: al hacerlo, la próxima vez le toca a la otra persona. */
+  rotate?: boolean
+  /** Quién lo hizo la última vez. */
+  lastBy?: 'nita' | 'kitos' | null
+}
+
+export type CareWho = 'nita' | 'kitos' | 'both'
+
+/** A quién le toca después de que `by` lo haga: con turnos, a la otra persona; si no, igual que antes. */
+export function nextWho(item: Pick<CareItem, 'who' | 'rotate'>, by: 'nita' | 'kitos'): CareWho {
+  if (!item.rotate) return item.who ?? 'both'
+  return by === 'nita' ? 'kitos' : 'nita'
 }
 
 export const INTERVALS: { label: string; n: number; unit: IntervalUnit }[] = [
   { label: 'Cada semana', n: 1, unit: 'week' },
+  { label: 'Cada 2 semanas', n: 2, unit: 'week' },
   { label: 'Cada mes', n: 1, unit: 'month' },
   { label: 'Cada 3 meses', n: 3, unit: 'month' },
   { label: 'Cada 6 meses', n: 6, unit: 'month' },
@@ -27,6 +42,7 @@ export const TYPICAL_CARE: { title: string; every: CareItem['every'] }[] = [
   { title: 'Desparasitación interna', every: { n: 3, unit: 'month' } },
   { title: 'Pipeta (desparasitación externa)', every: { n: 1, unit: 'month' } },
   { title: 'Cambio completo de arena', every: { n: 1, unit: 'week' } },
+  { title: 'Lavar la fuente', every: { n: 1, unit: 'week' } },
   { title: 'Cortar uñas', every: { n: 1, unit: 'month' } },
 ]
 

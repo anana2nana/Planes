@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ageText, daysUntil, describeEvery, nextDue } from '../src/lib/pet.ts'
+import { ageText, daysUntil, describeEvery, nextDue, nextWho } from '../src/lib/pet.ts'
 
 const today = new Date('2026-10-08T10:00')
 test('próxima vez según el intervalo', () => {
@@ -19,4 +19,12 @@ test('edad y textos', () => {
   assert.equal(ageText('2026-09-20', today), '2 semanas')
   assert.equal(describeEvery({ n: 3, unit: 'month' }), 'Cada 3 meses')
   assert.equal(describeEvery({ n: 2, unit: 'week' }), 'Cada 2 semanas')
+})
+
+test('turnos: al hacerlo, la próxima vez le toca a la otra persona', () => {
+  assert.equal(nextWho({ who: 'nita', rotate: true }, 'nita'), 'kitos')
+  assert.equal(nextWho({ who: 'nita', rotate: true }, 'kitos'), 'nita') // lo hizo Kitos aunque le tocaba a Nita
+  assert.equal(nextWho({ who: 'both', rotate: true }, 'kitos'), 'nita')
+  assert.equal(nextWho({ who: 'kitos', rotate: false }, 'nita'), 'kitos')
+  assert.equal(nextWho({}, 'nita'), 'both')
 })

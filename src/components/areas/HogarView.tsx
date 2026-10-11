@@ -33,7 +33,7 @@ export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m:
 
   if (section === 'meroe') return <HomeView me={me} onError={onError} onTitle={meroeTitle} />
   if (section === 'compra') return <ShoppingView me={me} onToast={onError} />
-  if (section === 'gata') return <PetView onError={onError} />
+  if (section === 'gata') return <PetView me={me} onError={onError} />
   if (section === 'notas') return <NotesView me={me} onError={onError} onToast={onError} />
   if (section === 'papeles') return <PapersView me={me} onError={onError} />
   if (section === 'mantenimiento') return <UpkeepView me={me} area="casa" onError={onError} />

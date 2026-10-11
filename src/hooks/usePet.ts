@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { arrayUnion, collection, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import type { CareItem } from '../lib/pet'
+import { nextWho, type CareItem } from '../lib/pet'
 
 export interface PetProfile {
   name: string
@@ -37,6 +37,9 @@ export function usePet() {
             every: x.every?.n && x.every?.unit ? x.every : { n: 1, unit: 'month' },
             last: typeof x.last === 'string' ? x.last : null,
             history: Array.isArray(x.history) ? x.history : [],
+            who: x.who === 'nita' || x.who === 'kitos' ? x.who : 'both',
+            rotate: x.rotate === true,
+            lastBy: x.lastBy === 'nita' || x.lastBy === 'kitos' ? x.lastBy : null,
           }
         }),
       ),
@@ -58,6 +61,7 @@ export function saveCare(item: Partial<CareItem> & { id?: string }) {
   const { id, ...data } = item
   return setDoc(id ? doc(careCol, id) : doc(careCol), data, { merge: true })
 }
-/** "Hecho hoy" (o en otra fecha). */
-export const markCareDone = (item: CareItem, date: string) => updateDoc(doc(careCol, item.id), { last: date, history: arrayUnion(date) })
+/** "Hecho hoy" (o en otra fecha) por `by`. Con turnos, la próxima vez le toca a la otra persona. */
+export const markCareDone = (item: CareItem, date: string, by: 'nita' | 'kitos') =>
+  updateDoc(doc(careCol, item.id), { last: date, lastBy: by, who: nextWho(item, by), history: arrayUnion(date) })
 export const deleteCare = (id: string) => deleteDoc(doc(careCol, id))

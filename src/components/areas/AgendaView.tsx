@@ -81,7 +81,7 @@ export function AgendaView({
         <CalendarView plans={plans} me={me} tags={tags} priorities={priorities} onOpen={onOpen} onToggle={onToggle} onCreate={onCreate} extra={extra} onGo={onGo} />
       ) : (
         <>
-          {mode === 'tareas' && <DueChores me={me} onError={onToast} petName={profile?.name ?? ''} petCare={care} onPetDone={(c, d) => markCareDone(c, d).catch((e: Error) => onToast(e.message))} />}
+          {mode === 'tareas' && <DueChores me={me} onError={onToast} petName={profile?.name ?? ''} petCare={care} onPetDone={(c, d) => markCareDone(c, d, me).catch((e: Error) => onToast(e.message))} />}
           <PlansView kind={mode === 'planes' ? 'plan' : 'task'} plans={plans} me={me} tags={tags} priorities={priorities} loading={loading} onOpen={onOpen} onToggle={onToggle} />
         </>
       )}

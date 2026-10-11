@@ -283,6 +283,7 @@ export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Eur
     every: d.get('every')?.n && d.get('every')?.unit ? d.get('every') : { n: 1, unit: 'month' },
     last: typeof d.get('last') === 'string' ? d.get('last') : null,
     history: [],
+    who: d.get('who') === 'nita' || d.get('who') === 'kitos' ? d.get('who') : 'both',
   }))
   for (const push of petPushes(care, String(petSnap.get('name') ?? ''), prefs, new Date())) await send(push)
 

@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { addWeight, deleteCare, markCareDone, removeWeight, saveCare, savePetProfile, usePet, type PetProfile } from '../../hooks/usePet'
 import { useSheetState } from '../../hooks/useSheetState'
-import { INTERVALS, TYPICAL_CARE, ageText, daysUntil, describeEvery, nextDue, ymd, type CareItem } from '../../lib/pet'
+import { INTERVALS, TYPICAL_CARE, ageText, daysUntil, describeEvery, nextDue, ymd, type CareItem, type CareWho } from '../../lib/pet'
+import { PEOPLE } from '../../lib/people'
+import type { PersonId } from '../../lib/types'
+import { Avatar } from '../Avatar'
+import { AssigneePicker } from '../Pickers'
 import { BottomSheet } from '../BottomSheet'
 import { CheckIcon, PlusIcon, TrashIcon } from '../Icons'
 import { LineChart } from './Charts'
@@ -21,7 +25,7 @@ function dueLabel(days: number): { text: string; tone: string } {
   return { text: `En ${days} días`, tone: 'bg-stone-100 text-stone-600' }
 }
 
-export function PetView({ onError }: { onError: (m: string) => void }) {
+export function PetView({ me, onError }: { me: PersonId; onError: (m: string) => void }) {
   const { profile, care, loading } = usePet()
   const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'profile' } | { type: 'care'; item: CareItem | null } | { type: 'weight' }>()
   const today = new Date()
@@ -70,7 +74,7 @@ export function PetView({ onError }: { onError: (m: string) => void }) {
           <Card className="space-y-3 text-center">
             <p className="text-sm text-muted">Apunta sus cuidados y os avisaremos la víspera de cada uno.</p>
             <button
-              onClick={() => TYPICAL_CARE.forEach((c) => saveCare({ title: c.title, every: c.every, last: null, history: [] }).catch(fail))}
+              onClick={() => TYPICAL_CARE.forEach((c) => saveCare({ title: c.title, every: c.every, last: null, history: [], who: 'both', rotate: false }).catch(fail))}
               className="rounded-2xl bg-ink px-4 py-2.5 text-sm font-bold text-cream active:scale-95"
             >
               Añadir los típicos (vacuna, desparasitar…)
@@ -90,14 +94,21 @@ export function PetView({ onError }: { onError: (m: string) => void }) {
                       <span className={`rounded-full px-2 py-0.5 font-bold ${label.tone}`}>{label.text}</span>
                       <span className="text-muted">
                         {describeEvery(c.every)}
-                        {c.last && ` · última ${fmtDate(c.last)}`}
+                        {c.last && ` · última ${fmtDate(c.last)}${c.lastBy ? ` (${PEOPLE[c.lastBy].name})` : ''}`}
                       </span>
                     </span>
+                    {c.who && c.who !== 'both' && (
+                      <span className="mt-1 block text-[11px] font-bold text-ink">
+                        {c.rotate ? '🔁 ' : ''}Le toca a {c.who === me ? 'ti' : PEOPLE[c.who].name}
+                      </span>
+                    )}
+                    {c.who === 'both' && c.rotate && <span className="mt-1 block text-[11px] font-bold text-muted">🔁 Por turnos (el primero que lo haga)</span>}
                   </button>
+                  {c.who && c.who !== 'both' && <Avatar mode={c.who} size="sm" />}
                   <button
                     onClick={() => {
                       navigator.vibrate?.(10)
-                      markCareDone(c, ymd(today)).catch(fail)
+                      markCareDone(c, ymd(today), me).catch(fail)
                     }}
                     disabled={c.last === ymd(today)}
                     className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 active:scale-95 disabled:opacity-40"
@@ -163,7 +174,7 @@ export function PetView({ onError }: { onError: (m: string) => void }) {
       </section>
 
       {sheet?.type === 'profile' && <ProfileSheet profile={profile} onClose={closeSheet} onError={onError} />}
-      {sheet?.type === 'care' && <CareSheet item={sheet.item} onClose={closeSheet} onError={onError} />}
+      {sheet?.type === 'care' && <CareSheet item={sheet.item} me={me} onClose={closeSheet} onError={onError} />}
       {sheet?.type === 'weight' && <WeightSheet onClose={closeSheet} onError={onError} />}
     </div>
   )
@@ -221,14 +232,16 @@ function ProfileSheet({ profile, onClose, onError }: { profile: PetProfile | nul
   )
 }
 
-function CareSheet({ item, onClose, onError }: { item: CareItem | null; onClose: () => void; onError: (m: string) => void }) {
+function CareSheet({ item, me, onClose, onError }: { item: CareItem | null; me: PersonId; onClose: () => void; onError: (m: string) => void }) {
   const [title, setTitle] = useState(item?.title ?? '')
+  const [who, setWho] = useState<CareWho>(item?.who ?? 'both')
+  const [rotate, setRotate] = useState(item?.rotate ?? false)
   const [every, setEvery] = useState(item?.every ?? { n: 1, unit: 'month' as const })
   const [last, setLast] = useState(item?.last ?? '')
   const save = () => {
     if (!title.trim()) return
     const history = item?.history ?? []
-    saveCare({ id: item?.id, title: title.trim(), every, last: last || null, history: last && !history.includes(last) ? [...history, last] : history }).catch((e: Error) => onError(e.message))
+    saveCare({ id: item?.id, title: title.trim(), every, who, rotate, last: last || null, history: last && !history.includes(last) ? [...history, last] : history }).catch((e: Error) => onError(e.message))
     onClose()
   }
   return (
@@ -256,6 +269,28 @@ function CareSheet({ item, onClose, onError }: { item: CareItem | null; onClose:
               )
             })}
           </div>
+        </div>
+        <div>
+          <Label>¿A quién le toca?</Label>
+          <AssigneePicker value={who} onChange={(m) => m !== 'duplicate' && setWho(m)} me={me} allowDuplicate={false} />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={rotate}
+            onClick={() => setRotate((r) => !r)}
+            className={`mt-2 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left ${rotate ? 'bg-ink text-cream' : 'bg-stone-100'}`}
+          >
+            <span className="text-lg" aria-hidden>
+              🔁
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-bold">Por turnos</span>
+              <span className={`block text-xs ${rotate ? 'opacity-80' : 'text-muted'}`}>Cuando uno lo hace, la próxima vez le toca al otro</span>
+            </span>
+            <span className={`h-6 w-10 rounded-full p-0.5 transition ${rotate ? 'bg-emerald-500' : 'bg-stone-300'}`}>
+              <span className={`block size-5 rounded-full bg-white transition ${rotate ? 'translate-x-4' : ''}`} />
+            </span>
+          </button>
         </div>
         <div>
           <Label>Última vez</Label>

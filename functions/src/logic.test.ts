@@ -300,6 +300,15 @@ test('gata: aviso la víspera de un cuidado y recordatorio semanal si sigue pend
   assert.equal(late[0].title, '🐱 Pendiente con la gata')
   assert.equal(petPushes([pipeta], '', prefs, new Date('2026-10-12T20:00:00')).length, 0)
   assert.equal(petPushes([{ ...pipeta, last: null }], '', prefs, new Date('2026-10-12T20:00:00')).length, 0)
+
+  // Asignado: solo le llega a quien le toca
+  const both = { nita: { ...DEFAULT_PREFS, home: true }, kitos: { ...DEFAULT_PREFS, home: true } }
+  const fuente = { id: 'f', title: 'Lavar la fuente', every: { n: 1, unit: 'week' as const }, last: '2026-10-02', history: [], who: 'kitos' as const }
+  const r = petPushes([fuente, pipeta], 'Mía', both, new Date('2026-10-08T20:00:00'))
+  assert.deepEqual(r.map((x) => x.to), ['nita', 'kitos'])
+  assert.equal(r[0].body.split('\n')[0], 'Pipeta')
+  assert.match(r[1].body, /^Lavar la fuente · te toca a ti\nPipeta\n/)
+  assert.deepEqual(petPushes([fuente], 'Mía', both, new Date('2026-10-08T20:00:00')).map((x) => x.to), ['kitos'])
 })
 
 import { buildIcs, escapeText, feedPlans, fold, type IcsPlan } from './ics.js'

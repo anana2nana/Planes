@@ -244,7 +244,9 @@ export function DueChores({ me, onError, petName, petCare, onPetDone }: { me: Pe
   const t = ymd(today)
   const due = [
     ...items.filter((u) => u.last).map((u) => ({ key: `u-${u.id}`, emoji: u.area === 'casa' ? '🧰' : '🚗', title: u.title, days: daysUntil(nextDue(u, today), today), done: () => saveItem('upkeep', { ...u, last: t, lastBy: me, history: u.history.includes(t) ? u.history : [...u.history, t] }, me, onError) })),
-    ...petCare.filter((c) => c.last).map((c) => ({ key: `p-${c.id}`, emoji: '🐱', title: `${c.title}${petName ? ` (${petName})` : ''}`, days: daysUntil(nextDue(c, today), today), done: () => onPetDone(c, t) })),
+    ...petCare
+      .filter((c) => c.last)
+      .map((c) => ({ key: `p-${c.id}`, emoji: '🐱', title: `${c.title}${petName ? ` (${petName})` : ''}`, days: daysUntil(nextDue(c, today), today), who: c.who && c.who !== 'both' ? c.who : null, done: () => onPetDone(c, t) })),
   ]
     .filter((x) => x.days <= 3)
     .sort((a, b) => a.days - b.days)
@@ -260,7 +262,10 @@ export function DueChores({ me, onError, petName, petCare, onPetDone }: { me: Pe
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold">{x.title}</span>
-              <span className={`block text-xs ${x.days <= 0 ? 'font-bold text-rose-600' : 'text-amber-700'}`}>{dueText(x.days)}</span>
+              <span className={`block text-xs ${x.days <= 0 ? 'font-bold text-rose-600' : 'text-amber-700'}`}>
+                {dueText(x.days)}
+                {'who' in x && x.who ? ` · le toca a ${x.who === me ? 'ti' : x.who === 'nita' ? 'Nita' : 'Kitos'}` : ''}
+              </span>
             </span>
             <button
               onClick={() => {
