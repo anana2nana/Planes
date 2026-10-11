@@ -22,7 +22,7 @@ function buildRepeat(draft: PlanDraft): Repeat | null {
   if (draft.repeatDays.length === 0) return null
   // Los turnos solo tienen sentido en tareas/planes asignados a una persona.
   const canRotate = draft.kind !== 'event' && (draft.mode === 'nita' || draft.mode === 'kitos')
-  return { days: [...draft.repeatDays].sort(), yearly: false, rotate: draft.rotate && canRotate }
+  return { days: [...draft.repeatDays].sort(), yearly: false, rotate: draft.rotate && canRotate, ...(draft.repeatEvery === 2 ? { every: 2 } : {}) }
 }
 
 function sharedFields(draft: PlanDraft, seriesId: string | null) {
@@ -81,7 +81,10 @@ export async function createPlan(draft: PlanDraft, me: PersonId, extra: Record<s
  */
 export async function updatePlan(plan: Plan, draft: PlanDraft, siblings: Plan[]) {
   const batch = writeBatch(db)
-  const shared = { ...sharedFields(draft, plan.seriesId), updatedAt: serverTimestamp() }
+  const fields = sharedFields(draft, plan.seriesId)
+  // Cambiar la fecha a mano (no con "Posponer") fija un ritmo nuevo desde ese día.
+  const moved = (fields.dueAt?.toMillis() ?? null) !== (plan.dueAt?.toMillis() ?? null)
+  const shared = { ...fields, ...(moved ? { anchorAt: null } : {}), updatedAt: serverTimestamp() }
   const ref = doc(plansCol, plan.id)
 
   if (plan.groupId) {
@@ -134,7 +137,7 @@ export function toggleDone(
   let nextAssignee: Assignee = plan.assignee
   const alreadySpawned = allPlans.some((p) => p.spawnedFrom === plan.id)
   if (done && plan.kind !== 'event' && plan.repeat && plan.dueAt && !alreadySpawned) {
-    next = nextOccurrence(plan.dueAt.toDate(), plan.repeat)
+    next = nextOccurrence(plan.dueAt.toDate(), plan.repeat, new Date(), plan.anchorAt?.toDate() ?? null)
     // Turnos: la siguiente vez le toca a la otra persona.
     if (plan.repeat.rotate && plan.assignee !== 'both' && !plan.groupId) nextAssignee = partnerOf(plan.assignee)
     if (next) {
@@ -166,6 +169,19 @@ export function toggleDone(
   }
 
   return { next, nextAssignee, committed: batch.commit() }
+}
+
+/**
+ * Posponer una tarea o plan a otro día (misma hora) sin cambiar su ritmo:
+ * si se repite, la siguiente vez sigue tocando el día de siempre.
+ */
+export function postponePlan(plan: Plan, day: Date) {
+  if (!plan.dueAt) return Promise.resolve()
+  const due = plan.dueAt.toDate()
+  const to = new Date(day.getFullYear(), day.getMonth(), day.getDate(), due.getHours(), due.getMinutes(), due.getSeconds())
+  const batch = writeBatch(db)
+  batch.update(doc(plansCol, plan.id), { dueAt: Timestamp.fromDate(to), anchorAt: plan.anchorAt ?? plan.dueAt, updatedAt: serverTimestamp() })
+  return batch.commit()
 }
 
 export async function deletePlans(ids: string[]) {

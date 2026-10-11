@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_PREFS, activityPushes, digestPush, formatRemaining, normalizePrefs, reminderPushes, rolloverDue, specialDay, type PlanData } from './logic.js'
+import { DEFAULT_PREFS, activityPushes, digestPush, overduePush, formatRemaining, normalizePrefs, reminderPushes, rolloverDue, specialDay, type PlanData } from './logic.js'
 
 const H = 3_600_000
 const NOW = Date.parse('2026-10-06T10:00:00+02:00')
@@ -213,9 +213,18 @@ test('resumen de la mañana: lo de hoy de cada uno, en orden, con atrasadas', ()
   ]
   const n = digestPush('nita', plans, morning)!
   assert.equal(n.title, '☀️ Buenos días, Nita')
-  assert.equal(n.body, '📅 Dentista 10:30 · 💞 Cena 21:00 · 🧹 Arenero\n⚠️ 1 pendiente atrasada')
+  assert.equal(n.body, '📅 Dentista 10:30 · 💞 Cena 21:00 · 🧹 Arenero\n⚠️ Sigue pendiente: Pagar luz (desde el domingo 4)')
   assert.equal(digestPush('kitos', plans, morning)!.body, '🧹 Bici 12:00 · 💞 Cena 21:00')
   assert.equal(digestPush('kitos', [plans[6]], morning), null)
+  // Sin resumen: aviso solo de lo atrasado, cada mañana hasta hacerlo
+  const o = overduePush('nita', plans, morning)!
+  assert.equal(o.title, '⚠️ Tienes algo pendiente')
+  assert.equal(o.body, '🧹 Pagar luz (desde el domingo 4)\nMárcalo como hecho o pospónlo en la app.')
+  assert.equal(overduePush('kitos', plans, morning), null)
+  const more = [...plans, plan({ id: 'h', kind: 'task', title: 'Fregar', assignee: 'both', dueMs: at('2026-10-05T20:00:00') }), plan({ id: 'i', kind: 'plan', title: 'Museo', assignee: 'nita', dueMs: at('2026-09-20T20:00:00') })]
+  assert.equal(digestPush('nita', more, morning)!.body.split('\n')[1], '⚠️ Siguen pendientes: Museo, Pagar luz y 1 más')
+  assert.match(overduePush('kitos', more, morning)!.body, /^🧹 Fregar \(desde el lunes 5\)/)
+  assert.match(overduePush('nita', more, morning)!.body, /^💞 Museo \(desde el 20 sept\)/)
 })
 
 test('preferencias nuevas con valores por defecto', () => {

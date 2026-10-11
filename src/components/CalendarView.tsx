@@ -71,7 +71,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
       add({ plan, date: due, virtual: false })
       // Repeticiones futuras (las reales se crean al completar / al pasar la cita).
       if (plan.repeat && !plan.done) {
-        upcomingOccurrences(due, plan.repeat, gridEnd).forEach((date) => add({ plan, date, virtual: true }))
+        upcomingOccurrences(due, plan.repeat, gridEnd, 60, plan.anchorAt?.toDate() ?? null).forEach((date) => add({ plan, date, virtual: true }))
       }
     }
     map.forEach((list) => list.sort((a, b) => a.date.getTime() - b.date.getTime()))
@@ -101,7 +101,7 @@ export function CalendarView({ plans, me, tags, priorities, onOpen, onToggle, on
     for (const plan of plans) {
       if (plan.kind !== 'event' || !plan.dueAt) continue
       const due = plan.dueAt.toDate()
-      const dates = [due, ...(plan.repeat ? upcomingOccurrences(due, plan.repeat, until) : [])]
+      const dates = [due, ...(plan.repeat ? upcomingOccurrences(due, plan.repeat, until, 60, plan.anchorAt?.toDate() ?? null) : [])]
       dates
         .filter((date) => {
           // Las de todo el día cuentan hasta que acaba el día.

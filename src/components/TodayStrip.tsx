@@ -14,6 +14,7 @@ import { ymd } from '../lib/menu'
 
 const EMOJI = { plan: '💞', task: '🧹' }
 const timeFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' })
+const sinceFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric' })
 
 /** "Hoy para ti": lo de hoy de la persona (suyo o de los dos) y lo que arrastra atrasado. */
 export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu, onToast = console.error }: { plans: Plan[]; me: PersonId; onOpen: (p: Plan) => void; onGoTasks: () => void; onGoMenu?: () => void; onToast?: (m: string) => void }) {
@@ -22,7 +23,8 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu, onToast = c
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
   const mine = plans.filter((p) => !p.done && p.dueAt && (p.assignee === me || p.assignee === 'both'))
   const today = mine.filter((p) => p.dueAt!.toMillis() >= start && p.dueAt!.toMillis() < end).sort((a, b) => a.dueAt!.toMillis() - b.dueAt!.toMillis())
-  const overdue = mine.filter((p) => p.kind !== 'event' && p.dueAt!.toMillis() < start).length
+  const late = mine.filter((p) => p.kind !== 'event' && p.dueAt!.toMillis() < start).sort((a, b) => a.dueAt!.toMillis() - b.dueAt!.toMillis())
+  const overdue = late.length
   const MAX = 4
   const { since } = useCouple()
   const special = since ? specialDay(since, now) : null
@@ -133,10 +135,28 @@ export function TodayStrip({ plans, me, onOpen, onGoTasks, onGoMenu, onToast = c
         />
       )}
       {overdue > 0 && (
-        <button onClick={onGoTasks} className="mt-2 flex w-full items-center gap-1.5 rounded-xl bg-surface/70 px-3 py-2 text-left text-xs font-bold text-rose-700 active:scale-[0.99]">
-          ⚠️ {overdue} {overdue === 1 ? 'pendiente atrasada' : 'pendientes atrasadas'}
-          <ChevronIcon className="ml-auto size-3.5" />
-        </button>
+        <div className="mt-2 rounded-xl bg-surface/70 p-2">
+          <p className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wide text-rose-700">⚠️ Sigue pendiente</p>
+          <ul>
+            {late.slice(0, 3).map((p) => (
+              <li key={p.id}>
+                <button onClick={() => onOpen(p)} className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left active:bg-surface">
+                  <span aria-hidden className="w-5 text-center">
+                    {EMOJI[p.kind as 'plan' | 'task']}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.title}</span>
+                  <span className="shrink-0 text-xs font-semibold text-rose-700">desde el {sinceFmt.format(p.dueAt!.toDate())}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {overdue > 3 && (
+            <button onClick={onGoTasks} className="flex w-full items-center gap-1.5 px-1 pt-1 text-left text-xs font-bold text-rose-700">
+              y {overdue - 3} más
+              <ChevronIcon className="ml-auto size-3.5" />
+            </button>
+          )}
+        </div>
       )}
     </section>
   )

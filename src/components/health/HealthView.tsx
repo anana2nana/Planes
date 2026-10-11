@@ -259,7 +259,7 @@ function HealthSheet({ item, me, onClose, onError }: { item: Partial<HealthItem>
     const title = d.title.trim()
     if (toAgenda) {
       createPlan(
-        { kind: 'event', title, notes: [d.doctor.trim(), d.notes.trim()].filter(Boolean).join('\n'), mode: me, dueDate: d.date!, dueTime: time, priority: 'medium', tagIds: [], repeatDays: [], repeatYearly: false, rotate: false, remindWeekBefore: false, place: null },
+        { kind: 'event', title, notes: [d.doctor.trim(), d.notes.trim()].filter(Boolean).join('\n'), mode: me, dueDate: d.date!, dueTime: time, priority: 'medium', tagIds: [], repeatDays: [], repeatYearly: false, repeatEvery: 1, rotate: false, remindWeekBefore: false, place: null },
         me,
         { health: true },
       ).catch((e: Error) => onError(e.message))

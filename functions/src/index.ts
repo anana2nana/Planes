@@ -19,6 +19,8 @@ import {
   LATE_GRACE_MIN,
   activityPushes,
   digestPush,
+  overduePush,
+  DEFAULT_PREFS,
   mealLine,
   onThisDayLine,
   menuReminder,
@@ -219,10 +221,17 @@ export const dailyDigest = onSchedule({ schedule: '0 * * * *', timeZone: 'Europe
   const now = new Date()
   const prefs = await loadPrefs()
   const people = (['nita', 'kitos'] as const).filter((p) => prefs[p].digest && prefs[p].digestHour === now.getHours())
-  if (people.length === 0) return
+  // Quien no quiere el resumen recibe igualmente lo que lleva atrasado, a la hora de siempre (8:00).
+  const lateOnly = (['nita', 'kitos'] as const).filter((p) => !prefs[p].digest && prefs[p].reminders && now.getHours() === DEFAULT_PREFS.digestHour)
+  if (people.length === 0 && lateOnly.length === 0) return
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   const snap = await db.collection('plans').where('done', '==', false).where('dueAt', '<', Timestamp.fromDate(endOfToday)).get()
   const plans = snap.docs.map((d) => toPlan(d)!)
+  for (const person of lateOnly) {
+    const push = overduePush(person, plans, now.getTime())
+    if (push) await send(push)
+  }
+  if (people.length === 0) return
   const since = (await db.doc('config/couple').get()).get('since')
   const special = typeof since === 'string' ? specialDay(since, now) : null
   const todayKey = ymdOf(now)

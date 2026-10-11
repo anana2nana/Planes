@@ -19,7 +19,12 @@ export interface Repeat {
   yearly: boolean
   /** Turnos: cada repetición le toca a la otra persona. */
   rotate: boolean
+  /** Cada cuántas semanas (1 = todas, 2 = una sí y otra no). Sin dato = 1. */
+  every?: number
 }
+
+/** Cada cuántas semanas se repite (1 o 2). */
+export const everyOf = (r: Pick<Repeat, 'every'>) => (r.every === 2 ? 2 : 1)
 
 /** Orden de la semana en España (lunes primero). */
 export const WEEK_ORDER: Weekday[] = [1, 2, 3, 4, 5, 6, 0]
@@ -43,7 +48,7 @@ export function parseRepeat(raw: unknown): Repeat | null {
   const days = Array.isArray(r.days) ? r.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : []
   const yearly = r.yearly === true
   if (!yearly && days.length === 0) return null
-  return { days: yearly ? [] : days, yearly, rotate: !yearly && r.rotate === true }
+  return { days: yearly ? [] : days, yearly, rotate: !yearly && r.rotate === true, ...(!yearly && r.every === 2 ? { every: 2 } : {}) }
 }
 
 function startOfDay(d: Date): Date {
@@ -73,20 +78,48 @@ function addYears(d: Date, years: number): Date {
   return new Date(y, d.getMonth(), Math.min(d.getDate(), lastDay), d.getHours(), d.getMinutes(), d.getSeconds())
 }
 
+/** Semanas entre los lunes de las semanas de `a` y `b` (sin líos con el cambio de hora). */
+function weeksBetween(a: Date, b: Date): number {
+  const monday = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
+  return Math.round((monday(b) - monday(a)) / (7 * 86_400_000))
+}
+
+/** ¿Toca en la semana de `day`? (con "cada 2 semanas", solo en las semanas pares contando desde `anchor`). */
+function inPhase(day: Date, anchor: Date, every: number): boolean {
+  return every <= 1 || weeksBetween(anchor, day) % every === 0
+}
+
+/** Primer día desde `from` (incluido) que cae en `days` y en una semana que toca. */
+function nextInPhase(from: Date, days: number[], anchor: Date, every: number): Date | null {
+  if (days.length === 0) return null
+  const start = startOfDay(from)
+  for (let i = 0; i <= 7 * every; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+    if (days.includes(d.getDay()) && inPhase(d, anchor, every)) return d
+  }
+  return null
+}
+
 /**
  * Siguiente vez que toca algo repetido (al completarlo, o cuando pasa una cita).
  * - A tiempo (o antes): la siguiente repetición después de su fecha.
  * - Si ya pasó su día: la primera repetición a partir de hoy (no se acumulan atrasos).
- * Mantiene la hora original.
+ * Mantiene la hora original. `anchor` es el día que tocaba antes de posponerlo:
+ * el ritmo (día de la semana y semanas alternas) se cuenta desde ahí, no desde el día pospuesto.
  */
-export function nextOccurrence(due: Date, repeat: Repeat, now = new Date()): Date | null {
-  const overdue = startOfDay(due).getTime() < startOfDay(now).getTime()
+export function nextOccurrence(due: Date, repeat: Repeat, now = new Date(), anchor: Date | null = null): Date | null {
+  const base = anchor ?? due
+  const overdue = startOfDay(base).getTime() < startOfDay(now).getTime()
   if (repeat.yearly) {
     let next = addYears(due, 1)
     for (let n = 2; startOfDay(next).getTime() < startOfDay(now).getTime() && n < 200; n++) next = addYears(due, n)
     return next
   }
-  const day = overdue ? nextMatchingDay(now, repeat.days, true) : nextMatchingDay(due, repeat.days, false)
+  const b = startOfDay(base)
+  let from = overdue ? startOfDay(now) : new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1)
+  // Si estaba pospuesto, nunca antes (ni el mismo día) que el día al que se pospuso.
+  if (anchor && startOfDay(due).getTime() >= from.getTime()) from = new Date(due.getFullYear(), due.getMonth(), due.getDate() + 1)
+  const day = nextInPhase(from, repeat.days, b, everyOf(repeat))
   return day ? withTimeOf(day, due) : null
 }
 
@@ -96,7 +129,7 @@ export function firstOccurrence(days: number[], now = new Date()): Date | null {
 }
 
 /** Repeticiones futuras (sin contar `due`) hasta `until`, para pintarlas en el calendario. */
-export function upcomingOccurrences(due: Date, repeat: Repeat, until: Date, max = 60): Date[] {
+export function upcomingOccurrences(due: Date, repeat: Repeat, until: Date, max = 60, anchor: Date | null = null): Date[] {
   const out: Date[] = []
   if (repeat.yearly) {
     for (let n = 1; out.length < max; n++) {
@@ -106,20 +139,24 @@ export function upcomingOccurrences(due: Date, repeat: Repeat, until: Date, max 
     }
     return out
   }
-  let cursor = due
+  const base = startOfDay(anchor ?? due)
+  let cursor = new Date(Math.max(base.getTime(), startOfDay(due).getTime()))
   while (out.length < max) {
-    const day = nextMatchingDay(cursor, repeat.days, false)
+    const day = nextInPhase(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1), repeat.days, base, everyOf(repeat))
     if (!day || day.getTime() > until.getTime()) break
-    const occ = withTimeOf(day, due)
-    out.push(occ)
-    cursor = occ
+    out.push(withTimeOf(day, due))
+    cursor = day
   }
   return out
 }
 
-/** "Cada año", "Todos los días", "Entre semana", "Martes y sábados", "Lun, mié y vie"… */
-export function describeRepeat(repeat: Pick<Repeat, 'days' | 'yearly'>): string {
+/** "Cada año", "Todos los días", "Entre semana", "Martes y sábados", "Lun, mié y vie"… (y "cada 2 semanas"). */
+export function describeRepeat(repeat: Pick<Repeat, 'days' | 'yearly' | 'every'>): string {
   if (repeat.yearly) return 'Cada año'
+  if (everyOf(repeat) === 2) {
+    const one = describeRepeat({ days: repeat.days, yearly: false })
+    return `${one.startsWith('Cada ') ? one.replace('Cada ', 'Un ') + ' sí y otro no' : `${one}, cada 2 semanas`}`
+  }
   const set = new Set(repeat.days)
   if (set.size === 7) return 'Todos los días'
   if (set.size === 5 && [1, 2, 3, 4, 5].every((d) => set.has(d))) return 'Entre semana'

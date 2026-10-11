@@ -56,6 +56,7 @@ export function usePlans() {
                 spawnedFrom: data.spawnedFrom ?? null,
                 health: data.health === true,
                 dueAt: data.dueAt ?? null,
+                anchorAt: data.anchorAt ?? null,
                 allDay: data.allDay ?? false,
                 priority: data.priority ?? 'medium',
                 tagIds: data.tagIds ?? [],

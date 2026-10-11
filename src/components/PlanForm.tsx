@@ -3,7 +3,7 @@ import { KINDS, KIND_ORDER } from '../lib/kinds'
 import { PEOPLE, partnerOf } from '../lib/people'
 import { dateToDraft, formatDue } from '../lib/time'
 import { DAY_NAME, DAY_SHORT, WEEK_ORDER, describeRepeat, firstOccurrence, nextOccurrence, type Weekday } from '../lib/recurrence'
-import { createPlan, deletePlans, updatePlan } from '../services/plans'
+import { createPlan, deletePlans, postponePlan, updatePlan } from '../services/plans'
 import type { Kind, Plan, PersonId, PlanDraft, PriorityConfig, Tag } from '../lib/types'
 import { BottomSheet } from './BottomSheet'
 import { BellIcon, CalendarIcon, CopyIcon, FlagIcon, NoteIcon, PinIcon, RepeatIcon, TagIcon, TrashIcon, UsersIcon } from './Icons'
@@ -43,6 +43,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string, prefi
       tagIds: [],
       repeatDays: [],
       repeatYearly: false,
+      repeatEvery: 1,
       rotate: false,
       remindWeekBefore: false,
       place: null,
@@ -59,6 +60,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string, prefi
     tagIds: plan.tagIds,
     repeatDays: plan.repeat?.days ?? [],
     repeatYearly: plan.repeat?.yearly ?? false,
+    repeatEvery: plan.repeat?.every === 2 ? 2 : 1,
     rotate: plan.repeat?.rotate ?? false,
     remindWeekBefore: plan.remindWeekBefore,
     place: plan.place,
@@ -172,6 +174,8 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onS
           style={{ fontSize: 20 }}
         />
 
+        {isEdit && plan && !isEvent && !plan.done && plan.dueAt && <Postpone plan={plan} onDone={(m) => { onError(m); onClose() }} onError={onError} />}
+
         <Field icon={<UsersIcon className="size-4" />} label="Para quién">
           {isDuplicated ? (
             <div className="flex items-center gap-3 rounded-2xl bg-amber-50 p-3 text-sm">
@@ -247,6 +251,8 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onS
             kind={draft.kind}
             days={draft.repeatDays}
             yearly={draft.repeatYearly}
+            every={draft.repeatEvery}
+            onEvery={(n) => set('repeatEvery', n)}
             dueDate={draft.dueDate}
             dueTime={draft.dueTime}
             onChange={(days, yearly) =>
@@ -370,6 +376,8 @@ function RepeatPicker({
   kind,
   days,
   yearly,
+  every,
+  onEvery,
   dueDate,
   dueTime,
   onChange,
@@ -377,6 +385,8 @@ function RepeatPicker({
   kind: Kind
   days: number[]
   yearly: boolean
+  every: number
+  onEvery: (n: number) => void
   dueDate: string
   dueTime: string
   onChange: (days: number[], yearly: boolean) => void
@@ -384,7 +394,7 @@ function RepeatPicker({
   const isEvent = kind === 'event'
   const toggle = (d: number) => onChange(days.includes(d) ? days.filter((x) => x !== d) : [...days, d], false)
   const due = dueDate ? new Date(`${dueDate}T${dueTime || '23:59'}`) : null
-  const repeat = { days, yearly, rotate: false }
+  const repeat = { days, yearly, rotate: false, every }
   const repeats = yearly || days.length > 0
   const next = due && repeats ? nextOccurrence(due, repeat, due) : null
   const chip = (active: boolean) =>
@@ -428,6 +438,15 @@ function RepeatPicker({
           })}
         </div>
       )}
+      {!yearly && days.length > 0 && days.length < 7 && (
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-stone-100 p-1" role="radiogroup" aria-label="Cada cuántas semanas">
+          {[1, 2].map((n) => (
+            <button key={n} type="button" role="radio" aria-checked={every === n} onClick={() => onEvery(n)} className={`h-9 rounded-xl text-sm font-bold ${every === n ? 'bg-surface shadow-sm' : 'text-muted'}`}>
+              {n === 1 ? 'Todas las semanas' : 'Cada 2 semanas'}
+            </button>
+          ))}
+        </div>
+      )}
       {repeats && (
         <p className="text-xs text-muted">
           <b className="text-ink">{describeRepeat(repeat)}</b>
@@ -437,6 +456,53 @@ function RepeatPicker({
               : ` · al completarlo aparecerá el siguiente (${formatDue(next, !dueTime).toLowerCase()})`)}
         </p>
       )}
+    </div>
+  )
+}
+
+const longDay = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })
+
+/** Posponer a otro día sin cambiar el ritmo (si se repite, la siguiente sigue tocando su día de siempre). */
+function Postpone({ plan, onDone, onError }: { plan: Plan; onDone: (msg: string) => void; onError: (m: string) => void }) {
+  const [pick, setPick] = useState(false)
+  const today = new Date()
+  const due = plan.dueAt!.toDate()
+  const dayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const base = dayOf(due) > dayOf(today) ? due : today
+  const day = (n: number) => new Date(base.getFullYear(), base.getMonth(), base.getDate() + n)
+  const go = (d: Date) => {
+    postponePlan(plan, d).catch((e: Error) => onError(`No se pudo posponer: ${e.message}`))
+    onDone(`⏭ Pasa al ${longDay.format(d)}`)
+  }
+  const chip = 'shrink-0 rounded-full bg-surface px-3.5 py-1.5 text-sm font-semibold shadow-sm active:scale-95'
+  return (
+    <div className="space-y-2 rounded-2xl bg-sky-50 p-3">
+      <p className="text-sm font-bold text-sky-800">⏭ ¿No te da tiempo? Posponer</p>
+      <div className="no-scrollbar flex gap-2 overflow-x-auto">
+        <button type="button" className={chip} onClick={() => go(day(1))}>
+          {base === due ? 'Un día más' : 'Mañana'}
+        </button>
+        <button type="button" className={chip} onClick={() => go(day(2))}>
+          {base === due ? 'Dos días más' : 'Pasado mañana'}
+        </button>
+        <button type="button" className={chip} onClick={() => setPick((v) => !v)}>
+          Elegir día
+        </button>
+      </div>
+      {pick && (
+        <input
+          type="date"
+          aria-label="Posponer al día"
+          min={iso(day(1))}
+          onChange={(e) => {
+            if (!e.target.value) return
+            const [y, m, d] = e.target.value.split('-').map(Number)
+            go(new Date(y, m - 1, d))
+          }}
+          className="h-11 w-full rounded-xl border border-sky-200 bg-surface px-3 font-semibold"
+        />
+      )}
+      {plan.repeat && !plan.repeat.yearly && <p className="text-xs text-sky-800/80">La siguiente vez sigue su ritmo de siempre ({describeRepeat(plan.repeat).toLowerCase()}): no cambia el día.</p>}
     </div>
   )
 }

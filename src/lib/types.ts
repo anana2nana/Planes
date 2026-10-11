@@ -40,6 +40,8 @@ export interface Plan {
   /** Repetición anterior de la que se creó este plan al completarla. */
   spawnedFrom: string | null
   dueAt: Timestamp | null
+  /** Si se pospuso: el día que tocaba (el ritmo de las repeticiones sigue contando desde ahí). */
+  anchorAt?: Timestamp | null
   /** true = solo cuenta el día (vence a las 23:59). */
   allDay: boolean
   priority: PriorityId
@@ -80,6 +82,8 @@ export interface PlanDraft {
   /** Días en que se repite; vacío = no se repite (salvo `repeatYearly`). */
   repeatDays: number[]
   repeatYearly: boolean
+  /** Cada cuántas semanas (1 o 2). */
+  repeatEvery: number
   /** Turnos: cada repetición le toca a la otra persona. */
   rotate: boolean
   remindWeekBefore: boolean

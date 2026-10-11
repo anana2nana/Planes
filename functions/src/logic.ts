@@ -281,8 +281,8 @@ export function digestPush(person: Person, plans: PlanData[], nowMs: number, ext
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
   const mine = plans.filter((p) => !p.done && p.dueMs !== null && targetsOf(p.assignee).includes(person))
   const today = mine.filter((p) => p.dueMs! >= start && p.dueMs! < end).sort((a, b) => a.dueMs! - b.dueMs!)
-  const overdue = mine.filter((p) => p.kind !== 'event' && p.dueMs! < start).length
-  if (today.length === 0 && overdue === 0 && !extra) return null
+  const overdue = overdueOf(mine, start)
+  if (today.length === 0 && overdue.length === 0 && !extra) return null
 
   const MAX = 4
   const parts = today.slice(0, MAX).map((p) => {
@@ -290,9 +290,52 @@ export function digestPush(person: Person, plans: PlanData[], nowMs: number, ext
     return `${emoji} ${p.title}${p.allDay ? '' : ` ${timeOf(p.dueMs!)}`}`
   })
   if (today.length > MAX) parts.push(`y ${today.length - MAX} más`)
-  const late = overdue ? `⚠️ ${overdue} ${overdue === 1 ? 'pendiente atrasada' : 'pendientes atrasadas'}` : ''
+  const late = overdueLine(overdue, nowMs)
   const body = [extra, parts.length ? parts.join(' · ') : extra ? '' : 'Nada para hoy.', late].filter(Boolean).join('\n')
   return { to: person, kind: 'reminder', title: `☀️ Buenos días, ${NAME[person]}`, body, tag: 'digest' }
+}
+
+/** Tareas y planes de días anteriores sin hacer (lo más antiguo primero). */
+function overdueOf(mine: PlanData[], startOfToday: number): PlanData[] {
+  return mine.filter((p) => p.kind !== 'event' && p.dueMs! < startOfToday).sort((a, b) => a.dueMs! - b.dueMs!)
+}
+
+const sinceFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric' })
+const monthFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
+/** "desde el martes 6" (o "desde el 3 sept" si hace más de una semana). */
+function sinceText(dueMs: number, nowMs: number): string {
+  return `desde el ${nowMs - dueMs < 6 * 86_400_000 ? sinceFmt.format(dueMs) : monthFmt.format(dueMs)}`
+}
+
+/** "⚠️ Sigue pendiente: Pagar luz (desde el domingo 4)" · "⚠️ Siguen pendientes: A, B y 2 más". */
+function overdueLine(overdue: PlanData[], nowMs: number): string {
+  if (overdue.length === 0) return ''
+  if (overdue.length === 1) return `⚠️ Sigue pendiente: ${overdue[0].title} (${sinceText(overdue[0].dueMs!, nowMs)})`
+  const names = overdue.slice(0, 2).map((p) => p.title)
+  return `⚠️ Siguen pendientes: ${names.join(', ')}${overdue.length > 2 ? ` y ${overdue.length - 2} más` : ''}`
+}
+
+/**
+ * Para quien no quiere el resumen: cada mañana, solo lo que arrastra sin hacer
+ * (hasta que lo complete o lo posponga). null si no hay nada.
+ */
+export function overduePush(person: Person, plans: PlanData[], nowMs: number): Push | null {
+  const now = new Date(nowMs)
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const overdue = overdueOf(
+    plans.filter((p) => !p.done && p.dueMs !== null && targetsOf(p.assignee).includes(person)),
+    start,
+  )
+  if (overdue.length === 0) return null
+  const lines = overdue.slice(0, 4).map((p) => `${EMOJI[p.kind]} ${p.title} (${sinceText(p.dueMs!, nowMs)})`)
+  if (overdue.length > 4) lines.push(`y ${overdue.length - 4} más`)
+  return {
+    to: person,
+    kind: 'reminder',
+    title: overdue.length === 1 ? '⚠️ Tienes algo pendiente' : `⚠️ Tienes ${overdue.length} cosas pendientes`,
+    body: `${lines.join('\n')}\nMárcalo como hecho o pospónlo en la app.`,
+    tag: 'overdue',
+  }
 }
 
 // ─── Días especiales (misma lógica que src/lib/couple.ts) ───────────────────
