@@ -3,7 +3,8 @@ import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { SECTIONS, type Frequent, type SectionId, type ShoppingItem } from '../lib/shopping'
 
-const asSection = (s: unknown): SectionId => (typeof s === 'string' && s in SECTIONS ? (s as SectionId) : 'otros')
+// "Limpieza y casa" ya no existe: lo de limpieza se compra en el súper.
+const asSection = (s: unknown): SectionId => (s === 'casa' ? 'super' : typeof s === 'string' && s in SECTIONS ? (s as SectionId) : 'otros')
 
 export function useShopping() {
   const [items, setItems] = useState<ShoppingItem[]>([])

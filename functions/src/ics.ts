@@ -82,6 +82,7 @@ export function buildIcs(plans: IcsPlan[], nowMs: number, calName = 'Nitakitos')
     // Solo las citas llevan repetición: los planes y tareas crean su siguiente al completarse.
     if (p.kind === 'event' && p.repeat) {
       if (p.repeat.yearly) lines.push('RRULE:FREQ=YEARLY')
+      else if (p.repeat.months) lines.push(`RRULE:FREQ=MONTHLY${p.repeat.months > 1 ? `;INTERVAL=${p.repeat.months}` : ''}`)
       else if (p.repeat.days.length > 0) lines.push(`RRULE:FREQ=WEEKLY;${p.repeat.every === 2 ? 'INTERVAL=2;WKST=MO;' : ''}BYDAY=${[...p.repeat.days].sort().map((d) => DAYS[d]).join(',')}`)
     }
     const prefix = p.kind === 'event' ? '' : `${EMOJI[p.kind]} `

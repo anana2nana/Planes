@@ -45,3 +45,27 @@ test('textos y lectura', () => {
   assert.deepEqual(parseRepeat({ days: [2], every: 2 }), { days: [2], yearly: false, rotate: false, every: 2 })
   assert.deepEqual(parseRepeat({ days: [2] }), { days: [2], yearly: false, rotate: false })
 })
+
+test('cada mes, cada 3 o 6 meses y cada año', () => {
+  const m1 = { days: [], yearly: false, rotate: false, months: 1 }
+  assert.equal(ymd(nextOccurrence(at('2026-10-15'), m1, at('2026-10-15'))), '2026-11-15')
+  // El 31 cae en el último día de los meses cortos, pero vuelve al 31 cuando se puede
+  assert.equal(ymd(nextOccurrence(at('2027-01-31'), m1, at('2027-01-31'))), '2027-02-28')
+  assert.equal(ymd(nextOccurrence(at('2027-02-28'), m1, at('2027-02-28'), at('2027-01-31'))), '2027-03-31')
+  // Atrasada (no se hizo el 15) y hecha el 20: la siguiente, el 15 del mes que viene
+  assert.equal(ymd(nextOccurrence(at('2026-10-15'), m1, at('2026-10-20'))), '2026-11-15')
+  // Atrasada más de un mes: no se acumulan
+  assert.equal(ymd(nextOccurrence(at('2026-08-15'), m1, at('2026-10-20'))), '2026-11-15')
+  const m3 = { days: [], yearly: false, rotate: false, months: 3 }
+  assert.equal(ymd(nextOccurrence(at('2026-10-15'), m3, at('2026-10-15'))), '2027-01-15')
+  // Pospuesta del 15 al 18: la siguiente sigue siendo el 15
+  assert.equal(ymd(nextOccurrence(at('2026-10-18'), m3, at('2026-10-18'), at('2026-10-15'))), '2027-01-15')
+  assert.deepEqual(upcomingOccurrences(at('2026-10-15'), { ...m3, months: 6 }, at('2027-12-31')).map(ymd), ['2027-04-15', '2027-10-15'])
+  const y = { days: [], yearly: true, rotate: false }
+  assert.equal(ymd(nextOccurrence(at('2024-02-29'), y, at('2026-10-10'))), '2027-02-28')
+  assert.equal(ymd(nextOccurrence(at('2026-10-15'), y, at('2026-10-15'))), '2027-10-15')
+  assert.equal(describeRepeat(m1), 'Cada mes')
+  assert.equal(describeRepeat(m3), 'Cada 3 meses')
+  assert.deepEqual(parseRepeat({ days: [], months: 6, rotate: true }), { days: [], yearly: false, rotate: true, months: 6 })
+  assert.equal(parseRepeat({ days: [], months: 5 }), null)
+})

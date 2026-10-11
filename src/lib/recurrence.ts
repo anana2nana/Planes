@@ -21,7 +21,11 @@ export interface Repeat {
   rotate: boolean
   /** Cada cuántas semanas (1 = todas, 2 = una sí y otra no). Sin dato = 1. */
   every?: number
+  /** Cada N meses (1, 3 o 6), el mismo día del mes. Sin dato = por días de la semana. */
+  months?: number
 }
+
+export const MONTH_OPTIONS = [1, 3, 6] as const
 
 /** Cada cuántas semanas se repite (1 o 2). */
 export const everyOf = (r: Pick<Repeat, 'every'>) => (r.every === 2 ? 2 : 1)
@@ -47,7 +51,10 @@ export function parseRepeat(raw: unknown): Repeat | null {
   if (!r) return null
   const days = Array.isArray(r.days) ? r.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : []
   const yearly = r.yearly === true
+  const rotate = r.rotate === true
+  if (!yearly && typeof r.months === 'number' && (MONTH_OPTIONS as readonly number[]).includes(r.months)) return { days: [], yearly: false, rotate, months: r.months }
   if (!yearly && days.length === 0) return null
+  if (yearly) return { days: [], yearly: true, rotate }
   return { days: yearly ? [] : days, yearly, rotate: !yearly && r.rotate === true, ...(!yearly && r.every === 2 ? { every: 2 } : {}) }
 }
 
@@ -71,12 +78,15 @@ function nextMatchingDay(from: Date, days: number[], inclusive: boolean): Date |
   return null
 }
 
-/** El mismo día y hora `years` años después (29 feb → 28 feb en años no bisiestos). */
-function addYears(d: Date, years: number): Date {
-  const y = d.getFullYear() + years
-  const lastDay = new Date(y, d.getMonth() + 1, 0).getDate()
-  return new Date(y, d.getMonth(), Math.min(d.getDate(), lastDay), d.getHours(), d.getMinutes(), d.getSeconds())
+/** El mismo día y hora `months` meses después (31 → último día del mes; 29 feb → 28 feb). */
+function addMonths(d: Date, months: number): Date {
+  const target = new Date(d.getFullYear(), d.getMonth() + months, 1)
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  return new Date(target.getFullYear(), target.getMonth(), Math.min(d.getDate(), lastDay), d.getHours(), d.getMinutes(), d.getSeconds())
 }
+
+/** Cada cuántos meses, si se repite por meses (o cada año = 12); null si es por días de la semana. */
+const monthStep = (r: Repeat): number | null => (r.yearly ? 12 : r.months ?? null)
 
 /** Semanas entre los lunes de las semanas de `a` y `b` (sin líos con el cambio de hora). */
 function weeksBetween(a: Date, b: Date): number {
@@ -110,15 +120,20 @@ function nextInPhase(from: Date, days: number[], anchor: Date, every: number): D
 export function nextOccurrence(due: Date, repeat: Repeat, now = new Date(), anchor: Date | null = null): Date | null {
   const base = anchor ?? due
   const overdue = startOfDay(base).getTime() < startOfDay(now).getTime()
-  if (repeat.yearly) {
-    let next = addYears(due, 1)
-    for (let n = 2; startOfDay(next).getTime() < startOfDay(now).getTime() && n < 200; n++) next = addYears(due, n)
-    return next
-  }
   const b = startOfDay(base)
   let from = overdue ? startOfDay(now) : new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1)
   // Si estaba pospuesto, nunca antes (ni el mismo día) que el día al que se pospuso.
   if (anchor && startOfDay(due).getTime() >= from.getTime()) from = new Date(due.getFullYear(), due.getMonth(), due.getDate() + 1)
+  const step = monthStep(repeat)
+  if (step) {
+    // Siempre contando desde el día original (un 31 no se queda en 30 para siempre).
+    const at = withTimeOf(base, due)
+    for (let k = 1; k < 1200; k++) {
+      const next = addMonths(at, k * step)
+      if (startOfDay(next).getTime() >= from.getTime()) return next
+    }
+    return null
+  }
   const day = nextInPhase(from, repeat.days, b, everyOf(repeat))
   return day ? withTimeOf(day, due) : null
 }
@@ -131,11 +146,13 @@ export function firstOccurrence(days: number[], now = new Date()): Date | null {
 /** Repeticiones futuras (sin contar `due`) hasta `until`, para pintarlas en el calendario. */
 export function upcomingOccurrences(due: Date, repeat: Repeat, until: Date, max = 60, anchor: Date | null = null): Date[] {
   const out: Date[] = []
-  if (repeat.yearly) {
-    for (let n = 1; out.length < max; n++) {
-      const occ = addYears(due, n)
+  const step = monthStep(repeat)
+  if (step) {
+    const at = withTimeOf(anchor ?? due, due)
+    for (let k = 1; out.length < max; k++) {
+      const occ = addMonths(at, k * step)
       if (occ.getTime() > until.getTime()) break
-      out.push(occ)
+      if (startOfDay(occ).getTime() > startOfDay(due).getTime()) out.push(occ)
     }
     return out
   }
@@ -151,8 +168,9 @@ export function upcomingOccurrences(due: Date, repeat: Repeat, until: Date, max 
 }
 
 /** "Cada año", "Todos los días", "Entre semana", "Martes y sábados", "Lun, mié y vie"… (y "cada 2 semanas"). */
-export function describeRepeat(repeat: Pick<Repeat, 'days' | 'yearly' | 'every'>): string {
+export function describeRepeat(repeat: Pick<Repeat, 'days' | 'yearly' | 'every' | 'months'>): string {
   if (repeat.yearly) return 'Cada año'
+  if (repeat.months) return repeat.months === 1 ? 'Cada mes' : `Cada ${repeat.months} meses`
   if (everyOf(repeat) === 2) {
     const one = describeRepeat({ days: repeat.days, yearly: false })
     return `${one.startsWith('Cada ') ? one.replace('Cada ', 'Un ') + ' sí y otro no' : `${one}, cada 2 semanas`}`

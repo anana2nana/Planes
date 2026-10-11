@@ -1,14 +1,14 @@
-export type SectionId = 'super' | 'fresco' | 'casa' | 'farmacia' | 'gata' | 'otros'
+export type SectionId = 'super' | 'fresco' | 'deco' | 'farmacia' | 'gata' | 'otros'
 
 export const SECTIONS: Record<SectionId, { label: string; emoji: string }> = {
   super: { label: 'Súper', emoji: '🛒' },
   fresco: { label: 'Fresco', emoji: '🥦' },
-  casa: { label: 'Limpieza y casa', emoji: '🧽' },
+  deco: { label: 'Mobiliario y decoración', emoji: '🛋️' },
   farmacia: { label: 'Farmacia', emoji: '💊' },
   gata: { label: 'Gata', emoji: '🐱' },
   otros: { label: 'Otros', emoji: '📦' },
 }
-export const SECTION_ORDER: SectionId[] = ['super', 'fresco', 'casa', 'farmacia', 'gata', 'otros']
+export const SECTION_ORDER: SectionId[] = ['super', 'fresco', 'deco', 'farmacia', 'gata', 'otros']
 
 export interface ShoppingItem {
   id: string

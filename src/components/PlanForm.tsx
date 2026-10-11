@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { KINDS, KIND_ORDER } from '../lib/kinds'
 import { PEOPLE, partnerOf } from '../lib/people'
 import { dateToDraft, formatDue } from '../lib/time'
-import { DAY_NAME, DAY_SHORT, WEEK_ORDER, describeRepeat, firstOccurrence, nextOccurrence, type Weekday } from '../lib/recurrence'
+import { DAY_NAME, DAY_SHORT, MONTH_OPTIONS, WEEK_ORDER, describeRepeat, firstOccurrence, nextOccurrence, type Weekday } from '../lib/recurrence'
 import { createPlan, deletePlans, postponePlan, updatePlan } from '../services/plans'
 import type { Kind, Plan, PersonId, PlanDraft, PriorityConfig, Tag } from '../lib/types'
 import { BottomSheet } from './BottomSheet'
@@ -44,6 +44,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string, prefi
       repeatDays: [],
       repeatYearly: false,
       repeatEvery: 1,
+      repeatMonths: 0,
       rotate: false,
       remindWeekBefore: false,
       place: null,
@@ -61,6 +62,7 @@ function initialDraft(plan: Plan | null, kind: Kind, defaultDate?: string, prefi
     repeatDays: plan.repeat?.days ?? [],
     repeatYearly: plan.repeat?.yearly ?? false,
     repeatEvery: plan.repeat?.every === 2 ? 2 : 1,
+    repeatMonths: plan.repeat?.months ?? 0,
     rotate: plan.repeat?.rotate ?? false,
     remindWeekBefore: plan.remindWeekBefore,
     place: plan.place,
@@ -95,7 +97,7 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onS
   const isEvent = draft.kind === 'event'
   const isEdit = !!plan
   const isDuplicated = !!plan?.groupId
-  const repeats = draft.repeatYearly || draft.repeatDays.length > 0
+  const repeats = draft.repeatYearly || draft.repeatMonths > 0 || draft.repeatDays.length > 0
   const canRotate = !isEvent && !isDuplicated && repeats && (draft.mode === 'nita' || draft.mode === 'kitos')
   const canSave = draft.title.trim().length > 0 && !(isEvent && !draft.dueDate)
 
@@ -103,9 +105,8 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onS
     setDraft((d) => ({
       ...d,
       kind: k,
-      // Las citas no se duplican ni tienen turnos; "cada año" es solo para citas.
+      // Las citas no se duplican ni tienen turnos.
       mode: k === 'event' && d.mode === 'duplicate' ? 'both' : d.mode,
-      repeatYearly: k === 'event' ? d.repeatYearly : false,
     }))
 
   // Las escrituras no se esperan: Firestore las aplica en local al instante
@@ -251,20 +252,32 @@ export function PlanForm({ plan, defaultKind = 'plan', defaultDate, prefill, onS
             kind={draft.kind}
             days={draft.repeatDays}
             yearly={draft.repeatYearly}
+            months={draft.repeatMonths}
             every={draft.repeatEvery}
             onEvery={(n) => set('repeatEvery', n)}
             dueDate={draft.dueDate}
             dueTime={draft.dueTime}
-            onChange={(days, yearly) =>
+            onChange={(days, yearly, months = 0) =>
               setDraft((d) => {
-                // Si se repite y aún no tiene fecha, empieza el primer día que toque.
-                const first = days.length && !d.dueDate ? firstOccurrence(days) : null
+                // Si se repite y aún no tiene fecha, empieza el primer día que toque (por meses o años, hoy).
+                const current = d.dueDate ? new Date(`${d.dueDate}T12:00`) : null
+                const first = !current
+                  ? days.length
+                    ? firstOccurrence(days)
+                    : yearly || months
+                      ? new Date()
+                      : null
+                  : // Si la fecha no cae en los días elegidos, pasa al primero que toque desde esa fecha (o desde hoy).
+                    days.length && !days.includes(current.getDay())
+                    ? firstOccurrence(days, current.getTime() > Date.now() ? current : new Date())
+                    : null
                 return {
                   ...d,
                   repeatDays: days,
                   repeatYearly: yearly,
-                  // Al marcar "cada año" (cumpleaños), por defecto también avisa una semana antes.
-                  remindWeekBefore: yearly && !d.repeatYearly ? true : d.remindWeekBefore,
+                  repeatMonths: months,
+                  // Al marcar "cada año" en una cita (cumpleaños), por defecto también avisa una semana antes.
+                  remindWeekBefore: yearly && !d.repeatYearly && d.kind === 'event' ? true : d.remindWeekBefore,
                   dueDate: first ? dateToDraft(first, true).dueDate : d.dueDate,
                 }
               })
@@ -376,6 +389,7 @@ function RepeatPicker({
   kind,
   days,
   yearly,
+  months,
   every,
   onEvery,
   dueDate,
@@ -385,17 +399,19 @@ function RepeatPicker({
   kind: Kind
   days: number[]
   yearly: boolean
+  months: number
   every: number
   onEvery: (n: number) => void
   dueDate: string
   dueTime: string
-  onChange: (days: number[], yearly: boolean) => void
+  onChange: (days: number[], yearly: boolean, months?: number) => void
 }) {
   const isEvent = kind === 'event'
   const toggle = (d: number) => onChange(days.includes(d) ? days.filter((x) => x !== d) : [...days, d], false)
   const due = dueDate ? new Date(`${dueDate}T${dueTime || '23:59'}`) : null
-  const repeat = { days, yearly, rotate: false, every }
-  const repeats = yearly || days.length > 0
+  const repeat = { days, yearly, rotate: false, every, ...(months ? { months } : {}) }
+  const byDays = !yearly && !months
+  const repeats = yearly || months > 0 || days.length > 0
   const next = due && repeats ? nextOccurrence(due, repeat, due) : null
   const chip = (active: boolean) =>
     `shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-95 ${active ? 'bg-ink text-cream' : 'bg-stone-100 text-ink'}`
@@ -406,18 +422,22 @@ function RepeatPicker({
         <button type="button" onClick={() => onChange([], false)} className={chip(!repeats)}>
           No se repite
         </button>
-        {isEvent && (
-          <button type="button" onClick={() => onChange([], true)} className={chip(yearly)}>
-            🎂 Cada año
-          </button>
-        )}
         {WEEKLY_PRESETS.map((p) => (
-          <button key={p.label} type="button" onClick={() => onChange(p.days, false)} className={chip(!yearly && sameDays(days, p.days))}>
+          <button key={p.label} type="button" onClick={() => onChange(p.days, false)} className={chip(byDays && sameDays(days, p.days))}>
             {p.label}
           </button>
         ))}
+        {MONTH_OPTIONS.map((n) => (
+          <button key={n} type="button" onClick={() => onChange([], false, n)} className={chip(months === n)}>
+            {n === 1 ? 'Cada mes' : `Cada ${n} meses`}
+          </button>
+        ))}
+        <button type="button" onClick={() => onChange([], true)} className={chip(yearly)}>
+          {isEvent ? '🎂 Cada año' : 'Cada año'}
+        </button>
       </div>
-      {!yearly && (
+      <p className="-mt-1 text-[11px] text-muted">O elige los días de la semana:</p>
+      {(
         <div className="grid grid-cols-7 gap-1.5" role="group" aria-label="Días que se repite">
           {WEEK_ORDER.map((d: Weekday) => {
             const active = days.includes(d)
@@ -438,7 +458,7 @@ function RepeatPicker({
           })}
         </div>
       )}
-      {!yearly && days.length > 0 && days.length < 7 && (
+      {byDays && days.length > 0 && days.length < 7 && (
         <div className="grid grid-cols-2 gap-1 rounded-2xl bg-stone-100 p-1" role="radiogroup" aria-label="Cada cuántas semanas">
           {[1, 2].map((n) => (
             <button key={n} type="button" role="radio" aria-checked={every === n} onClick={() => onEvery(n)} className={`h-9 rounded-xl text-sm font-bold ${every === n ? 'bg-surface shadow-sm' : 'text-muted'}`}>
@@ -502,7 +522,7 @@ function Postpone({ plan, onDone, onError }: { plan: Plan; onDone: (msg: string)
           className="h-11 w-full rounded-xl border border-sky-200 bg-surface px-3 font-semibold"
         />
       )}
-      {plan.repeat && !plan.repeat.yearly && <p className="text-xs text-sky-800/80">La siguiente vez sigue su ritmo de siempre ({describeRepeat(plan.repeat).toLowerCase()}): no cambia el día.</p>}
+      {plan.repeat && <p className="text-xs text-sky-800/80">La siguiente vez sigue su ritmo de siempre ({describeRepeat(plan.repeat).toLowerCase()}): no cambia el día.</p>}
     </div>
   )
 }

@@ -18,10 +18,11 @@ const plansCol = collection(db, 'plans')
 const newId = () => doc(plansCol).id
 
 function buildRepeat(draft: PlanDraft): Repeat | null {
-  if (draft.repeatYearly) return { days: [], yearly: true, rotate: false }
-  if (draft.repeatDays.length === 0) return null
   // Los turnos solo tienen sentido en tareas/planes asignados a una persona.
   const canRotate = draft.kind !== 'event' && (draft.mode === 'nita' || draft.mode === 'kitos')
+  if (draft.repeatYearly) return { days: [], yearly: true, rotate: draft.rotate && canRotate }
+  if (draft.repeatMonths) return { days: [], yearly: false, rotate: draft.rotate && canRotate, months: draft.repeatMonths }
+  if (draft.repeatDays.length === 0) return null
   return { days: [...draft.repeatDays].sort(), yearly: false, rotate: draft.rotate && canRotate, ...(draft.repeatEvery === 2 ? { every: 2 } : {}) }
 }
 
@@ -154,6 +155,8 @@ export function toggleDone(
         priority: plan.priority,
         tagIds: plan.tagIds,
         repeat: plan.repeat,
+        // Por meses, el día original manda (un 31 vuelve a ser 31 tras febrero).
+        anchorAt: plan.repeat.months || plan.repeat.yearly ? (plan.anchorAt ?? plan.dueAt) : null,
         remindWeekBefore: plan.remindWeekBefore,
         place: plan.place,
         seriesId,

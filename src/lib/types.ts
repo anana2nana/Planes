@@ -84,6 +84,8 @@ export interface PlanDraft {
   repeatYearly: boolean
   /** Cada cuántas semanas (1 o 2). */
   repeatEvery: number
+  /** Cada N meses (1, 3, 6); 0 = no es mensual. */
+  repeatMonths: number
   /** Turnos: cada repetición le toca a la otra persona. */
   rotate: boolean
   remindWeekBefore: boolean
