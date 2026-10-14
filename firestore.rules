@@ -77,6 +77,10 @@ service cloud.firestore {
     }
 
     // Lista de la compra.
+    // Catálogo de Mercadona para los precios de la compra (lo escribe solo el servidor).
+    match /catalog/{docId} {
+      allow read: if isCouple();
+    }
     match /shopping/{itemId} {
       allow read, delete: if isCouple();
       allow create, update: if isCouple()

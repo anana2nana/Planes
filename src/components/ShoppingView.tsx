@@ -4,6 +4,11 @@ import { SECTIONS, SECTION_ORDER, itemKey, type SectionId, type ShoppingItem } f
 import type { PersonId } from '../lib/types'
 import { addShoppingItem, clearBought, deleteShoppingItem, toggleShoppingItem } from '../services/shopping'
 import { Avatar } from './Avatar'
+import { useSheetState } from '../hooks/useSheetState'
+import { eur, shoppingTotal, type Product } from '../lib/prices'
+import { BottomSheet } from './BottomSheet'
+import { ItemSheet } from './shopping/ItemSheet'
+import { ProductPicker } from './shopping/ProductPicker'
 import { CheckIcon, CloseIcon, PlusIcon } from './Icons'
 
 export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: string) => void }) {
@@ -11,6 +16,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
   const [text, setText] = useState('')
   const [section, setSection] = useState<SectionId>('super')
   const [showBought, setShowBought] = useState(false)
+  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; id: string } | { type: 'search'; q: string }>()
 
   const pending = items.filter((i) => !i.done)
   const bought = items.filter((i) => i.done).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0))
@@ -24,13 +30,19 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
   const typed = itemKey(text)
   const matching = typed ? frequent.filter((f) => f.key.includes(typed) && !pendingKeys.has(f.key) && f.key !== typed).slice(0, 4) : []
 
-  const add = (name: string, sec: SectionId) => {
+  const add = (name: string, sec: SectionId, product?: Product) => {
     if (!name.trim()) return
-    const ok = addShoppingItem(name, sec, me, items)
+    // Con producto elegido, su precio; si no, el de la última vez.
+    const last = frequent.find((f) => f.key === itemKey(name))
+    const extra = product ? { price: product.price, product } : last?.price != null ? { price: last.price, product: last.product } : {}
+    const ok = addShoppingItem(name, sec, me, items, extra)
     if (!ok) onToast(`«${name.trim()}» ya está en la lista`)
     else navigator.vibrate?.(8)
     setText('')
   }
+
+  const total = shoppingTotal(items)
+  const editing = sheet?.type === 'item' ? items.find((i) => i.id === sheet.id) : undefined
 
   const grouped = SECTION_ORDER.map((s) => ({ id: s, items: pending.filter((i) => i.section === s).sort((a, b) => a.createdAt - b.createdAt) })).filter(
     (g) => g.items.length > 0,
@@ -77,6 +89,11 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             )
           })}
         </div>
+        {text.trim().length >= 2 && (
+          <button type="button" onClick={() => openSheet({ type: 'search', q: text.trim() })} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 active:scale-95">
+            🔎 Buscar «{text.trim()}» en Mercadona o Ahorramás
+          </button>
+        )}
         {matching.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {matching.map((f) => (
@@ -97,18 +114,32 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
           <p className="mt-1 text-sm text-muted">Lo que añada uno le aparece al otro al momento.</p>
         </div>
       ) : (
-        grouped.map((g) => (
+        <>
+          {total.priced > 0 && (
+            <div className="flex items-center gap-3 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 text-white shadow-lg shadow-emerald-300/30">
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-bold uppercase tracking-wider opacity-90">Total aproximado</span>
+                <span className="tabular block text-3xl font-extrabold">{eur(total.total)}</span>
+              </span>
+              <span className="text-right text-xs opacity-90">
+                {total.priced === total.count ? 'Todo con precio' : `${total.priced} de ${total.count} con precio`}
+                {total.priced < total.count && <span className="block">Toca una cosa para ponérselo</span>}
+              </span>
+            </div>
+          )}
+          {grouped.map((g) => (
           <section key={g.id}>
             <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">
               {SECTIONS[g.id].emoji} {SECTIONS[g.id].label} <span className="opacity-60">· {g.items.length}</span>
             </h2>
             <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
               {g.items.map((i) => (
-                <Row key={i.id} item={i} me={me} />
+                <Row key={i.id} item={i} me={me} onOpen={() => openSheet({ type: 'item', id: i.id })} />
               ))}
             </div>
           </section>
-        ))
+          ))}
+        </>
       )}
 
       {/* Lo de siempre */}
@@ -150,17 +181,29 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
           {showBought && (
             <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface/70">
               {bought.map((i) => (
-                <Row key={i.id} item={i} me={me} />
+                <Row key={i.id} item={i} me={me} onOpen={() => openSheet({ type: 'item', id: i.id })} />
               ))}
             </div>
           )}
         </section>
       )}
+      {editing && <ItemSheet key={editing.id} item={editing} onClose={closeSheet} onError={onToast} />}
+      {sheet?.type === 'search' && (
+        <BottomSheet open onClose={closeSheet} title="Añadir del súper">
+          <ProductPicker
+            initial={sheet.q}
+            onPick={(p) => {
+              add(sheet.q, effectiveSection, p)
+              closeSheet()
+            }}
+          />
+        </BottomSheet>
+      )}
     </div>
   )
 }
 
-function Row({ item, me }: { item: ShoppingItem; me: PersonId }) {
+function Row({ item, me, onOpen }: { item: ShoppingItem; me: PersonId; onOpen: () => void }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
       <button
@@ -176,7 +219,27 @@ function Row({ item, me }: { item: ShoppingItem; me: PersonId }) {
       >
         {item.done && <CheckIcon className="size-3.5 animate-pop" />}
       </button>
-      <span className={`min-w-0 flex-1 truncate text-[15px] font-semibold ${item.done ? 'text-muted line-through' : ''}`}>{item.name}</span>
+      <button onClick={onOpen} className="min-w-0 flex-1 text-left" aria-label={`${item.name}: precio y cantidad`}>
+        <span className={`block truncate text-[15px] font-semibold ${item.done ? 'text-muted line-through' : ''}`}>
+          {item.qty > 1 && <span className="mr-1 text-muted">{item.qty}×</span>}
+          {item.name}
+        </span>
+        {item.product && (
+          <span className="block truncate text-[11px] text-muted">
+            {item.product.name}
+            {item.product.pack ? ` · ${item.product.pack}` : ''}
+          </span>
+        )}
+      </button>
+      {item.price !== null ? (
+        <span className={`tabular shrink-0 text-sm font-bold ${item.done ? 'text-muted' : ''}`}>{eur(item.price * item.qty)}</span>
+      ) : (
+        !item.done && (
+          <button onClick={onOpen} className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-muted" aria-label={`Poner precio a ${item.name}`}>
+            + €
+          </button>
+        )
+      )}
       {item.addedBy && !item.done && <Avatar mode={item.addedBy} size="xs" />}
       <button onClick={() => deleteShoppingItem(item.id).catch(console.error)} aria-label={`Quitar ${item.name}`} className="grid size-8 shrink-0 place-items-center rounded-full text-stone-300 active:bg-stone-100">
         <CloseIcon className="size-4" />

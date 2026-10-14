@@ -14,6 +14,7 @@ import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
 import { giftPushes, homePushes, petPushes, type GiftLite, capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes, type UpkeepLite } from './homeAlerts.js'
 import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
 import type { CareItem } from './pet.js'
+import { mercadonaCategoryIds, packRows, parseAhorramas, parseMercadonaCategory, type ShopProduct } from './shops.js'
 import type { Amount, CategoryId, Fund, HomeConfig, HomeItem, MonthlySchedule } from './home.js'
 import {
   LATE_GRACE_MIN,
@@ -404,4 +405,98 @@ export const calendarFeed = onRequest({ invoker: 'public', maxInstances: 1 }, as
   res.set('Content-Type', 'text/calendar; charset=utf-8')
   res.set('Cache-Control', 'private, max-age=300')
   res.send(buildIcs(plans, Date.now(), who === 'nita' ? 'Nitakitos · Nita' : who === 'kitos' ? 'Nitakitos · Kitos' : 'Nitakitos'))
+})
+
+// ─── Precios del súper (Mercadona y Ahorramás) ─────────────────────────────
+// Ninguno tiene API oficial: se lee lo mismo que ve su web, con calma y pocas veces.
+
+/** Almacén de Mercadona (los precios cambian según la zona): mad1 = Madrid. */
+const MERCADONA_WH = defineString('MERCADONA_WH', { default: 'mad1', description: 'Almacén de Mercadona (mad1 = Madrid)' })
+const BROWSER = {
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36',
+  'Accept-Language': 'es-ES,es;q=0.9',
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+async function getJson(url: string): Promise<unknown> {
+  const res = await fetch(url, { headers: { ...BROWSER, Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`${res.status} en ${url}`)
+  return res.json()
+}
+
+/**
+ * Descarga el catálogo de Mercadona de su zona (≈ 4.000 productos, uno por subcategoría)
+ * y lo guarda en unos pocos documentos `catalog/mercadona-N`. La app busca en él sin conexión.
+ */
+async function refreshMercadona(): Promise<number> {
+  const wh = MERCADONA_WH.value() || 'mad1'
+  const base = 'https://tienda.mercadona.es/api'
+  const root = await getJson(`${base}/categories/?lang=es&wh=${wh}`).catch(() => getJson(`${base}/v1_1/categories/?lang=es&wh=${wh}`))
+  const ids = mercadonaCategoryIds(root)
+  if (!ids.length) throw new Error('Mercadona no ha devuelto categorías (¿ha cambiado su web?)')
+  const all = new Map<string, ShopProduct>()
+  for (let i = 0; i < ids.length; i += 4) {
+    const parts = await Promise.all(ids.slice(i, i + 4).map((id) => getJson(`${base}/categories/${id}/?lang=es&wh=${wh}`).then(parseMercadonaCategory).catch(() => [] as ShopProduct[])))
+    parts.flat().forEach((p) => all.set(p.id, p))
+    await sleep(200)
+  }
+  const list = [...all.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  // Si algo ha ido mal, mejor quedarse con el catálogo anterior que con uno a medias.
+  if (list.length < 300) throw new Error(`Mercadona: solo ${list.length} productos (¿ha cambiado su web?)`)
+  const SIZE = 1500
+  const chunks = Math.ceil(list.length / SIZE)
+  const prev = (await db.doc('catalog/mercadona').get()).get('chunks') ?? 0
+  const batch = db.batch()
+  for (let c = 0; c < chunks; c++) batch.set(db.doc(`catalog/mercadona-${c}`), { rows: packRows(list.slice(c * SIZE, (c + 1) * SIZE)) })
+  for (let c = chunks; c < prev; c++) batch.delete(db.doc(`catalog/mercadona-${c}`))
+  batch.set(db.doc('catalog/mercadona'), { count: list.length, chunks, wh, updatedAt: FieldValue.serverTimestamp() })
+  await batch.commit()
+  logger.info(`Mercadona: ${list.length} productos (${wh})`)
+  return list.length
+}
+
+/** Cada lunes de madrugada, el catálogo de Mercadona al día. */
+export const refreshShopCatalog = onSchedule({ schedule: '15 5 * * 1', timeZone: 'Europe/Madrid', timeoutSeconds: 540, memory: '512MiB' }, async () => {
+  await refreshMercadona()
+})
+
+/** "Descargar ahora" desde la app (la primera vez, o si queréis precios recién actualizados). */
+export const shopCatalogNow = onCall({ timeoutSeconds: 540, memory: '512MiB' }, async (req) => {
+  if (!personOf(req.auth)) throw new HttpsError('permission-denied', 'Este espacio es privado.')
+  try {
+    return { count: await refreshMercadona() }
+  } catch (e) {
+    logger.error(e)
+    throw new HttpsError('unavailable', (e as Error).message)
+  }
+})
+
+const AHORRAMAS_SEARCH = ['https://www.ahorramas.com/buscador?q=', 'https://www.ahorramas.com/search?q=', 'https://www.ahorramas.com/on/demandware.store/Sites-Ahorramas-Site/es/Search-Show?q=']
+
+/** Buscar en Ahorramás (en su web, en el momento). Se guarda 3 días para no preguntar lo mismo cada vez. */
+export const shopSearch = onCall({ timeoutSeconds: 30 }, async (req) => {
+  if (!personOf(req.auth)) throw new HttpsError('permission-denied', 'Este espacio es privado.')
+  const q = String((req.data as { q?: unknown })?.q ?? '').trim().slice(0, 60)
+  if (q.length < 2) return { items: [] }
+  const key = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
+  const cacheRef = db.doc(`shopCache/ahorramas_${key}`)
+  const cached = await cacheRef.get()
+  if (cached.exists && Date.now() - (cached.get('at')?.toMillis?.() ?? 0) < 3 * 86_400_000) return { items: JSON.parse(cached.get('items')) }
+  let items: ShopProduct[] = []
+  let lastError = ''
+  for (const url of AHORRAMAS_SEARCH) {
+    try {
+      const res = await fetch(url + encodeURIComponent(q), { headers: { ...BROWSER, Accept: 'text/html' } })
+      if (!res.ok) {
+        lastError = `${res.status}`
+        continue
+      }
+      items = parseAhorramas(await res.text()).slice(0, 40)
+      if (items.length) break
+    } catch (e) {
+      lastError = (e as Error).message
+    }
+  }
+  if (!items.length) logger.warn(`Ahorramás sin resultados para «${q}» ${lastError}`)
+  else await cacheRef.set({ items: JSON.stringify(items), at: FieldValue.serverTimestamp() })
+  return { items }
 })

@@ -492,3 +492,56 @@ test('mantenimiento, suscripciones, salud y cápsula', () => {
     ['kitos: 💌 Mañana podrás abrir una carta de Nita'],
   )
 })
+
+// ─── Catálogos del súper ────────────────────────────────────────────────────
+import { mercadonaCategoryIds, packRows, parseAhorramas, parseMercadonaCategory } from './shops.js'
+
+test('Mercadona: subcategorías y productos con precio', () => {
+  assert.deepEqual(mercadonaCategoryIds({ results: [{ id: 12, name: 'Huevos, leche y mantequilla', categories: [{ id: 72, name: 'Leche y bebidas vegetales' }, { id: 75 }] }, { id: 13, categories: [] }] }), [72, 75])
+  const cat = {
+    id: 72,
+    name: 'Leche y bebidas vegetales',
+    categories: [
+      {
+        id: 72,
+        name: 'Leche',
+        products: [
+          { id: '10379', display_name: 'Leche semidesnatada Hacendado', packaging: 'Brick', thumbnail: 'https://prod-mercadona.imgix.net/images/abc.jpg?fit=crop&h=300&w=300', price_instructions: { unit_price: '0.94', unit_size: 1, size_format: 'l', reference_price: '0.940', reference_format: 'L', approx_size: false } },
+          { id: 3400, display_name: 'Plátano de Canarias', packaging: null, thumbnail: null, price_instructions: { unit_price: '0.35', unit_size: 0.18, size_format: 'kg', reference_price: '1.95', reference_format: 'kg', approx_size: true } },
+          { id: 1, display_name: 'Sin precio', price_instructions: {} },
+        ],
+      },
+    ],
+  }
+  const p = parseMercadonaCategory(cat)
+  assert.equal(p.length, 2)
+  assert.deepEqual(p[0], { store: 'mercadona', id: '10379', name: 'Leche semidesnatada Hacendado', pack: 'Brick 1 l', price: 0.94, ref: '0,94 €/L', image: 'https://prod-mercadona.imgix.net/images/abc.jpg' })
+  assert.equal(p[1].pack, '~0,18 kg')
+  assert.equal(p[1].ref, '1,95 €/kg')
+  assert.equal(JSON.parse(packRows(p))[0][1], 'Leche semidesnatada Hacendado')
+  assert.deepEqual(parseMercadonaCategory({ nada: true }), [])
+})
+
+test('Ahorramás: JSON-LD o fichas del listado', () => {
+  const ld = `<html><script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","itemListElement":[{"@type":"ListItem","item":{"@type":"Product","sku":"12345","name":"Leche entera Pascual 1 l","image":"/dw/image/leche.jpg","offers":{"@type":"Offer","price":"1.25","priceCurrency":"EUR"}}}]}</script></html>`
+  assert.deepEqual(parseAhorramas(ld), [{ store: 'ahorramas', id: '12345', name: 'Leche entera Pascual 1 l', pack: '', price: 1.25, ref: '', image: 'https://www.ahorramas.com/dw/image/leche.jpg' }])
+  const tiles = `<div class="product-grid">
+    <div class="product" data-pid="61234"><div class="product-tile" data-gtm="{&quot;name&quot;:&quot;Huevos camperos docena&quot;,&quot;price&quot;:&quot;3.49&quot;}">
+      <img class="tile-image" data-src="https://www.ahorramas.com/dw/huevos.jpg?sw=300" alt="Huevos camperos docena"/>
+      <a class="link product-name-gtm" href="/huevos-61234.html">Huevos camperos docena</a>
+      <span class="sales"><span class="value" content="3.49">3,49 €</span></span><span class="unit-price">0,29 € / ud</span>
+    </div></div>
+    <div class="product" data-pid="70001"><div class="product-tile">
+      <a class="pdp-link" href="/pan.html"><span>Pan de molde</span> integral</a>
+      <div class="price"><span class="sales">1,15 €</span></div><span class="unit">450 g</span>
+    </div></div>
+    <div class="product" data-pid="80000"><a class="pdp-link">Sin precio</a></div>
+  </div>`
+  const t = parseAhorramas(tiles)
+  assert.equal(t.length, 2)
+  assert.deepEqual(t[0], { store: 'ahorramas', id: '61234', name: 'Huevos camperos docena', pack: '', price: 3.49, ref: '0,29 €/ud', image: 'https://www.ahorramas.com/dw/huevos.jpg?sw=300' })
+  assert.equal(t[1].name, 'Pan de molde integral')
+  assert.equal(t[1].price, 1.15)
+  assert.equal(t[1].pack, '450 g')
+  assert.deepEqual(parseAhorramas('<html>nada</html>'), [])
+})

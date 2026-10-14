@@ -1,3 +1,5 @@
+import type { Product } from './prices.ts'
+
 export type SectionId = 'super' | 'fresco' | 'deco' | 'farmacia' | 'gata' | 'otros'
 
 export const SECTIONS: Record<SectionId, { label: string; emoji: string }> = {
@@ -18,6 +20,12 @@ export interface ShoppingItem {
   addedBy: 'nita' | 'kitos' | null
   createdAt: number
   doneAt: number | null
+  /** Precio de una unidad (€), a mano o del catálogo. */
+  price: number | null
+  /** Cuántas (para el total). */
+  qty: number
+  /** Producto elegido en Mercadona o Ahorramás. */
+  product: Product | null
 }
 
 /** Lo que soléis comprar (para las sugerencias): veces y última sección usada. */
@@ -26,6 +34,9 @@ export interface Frequent {
   name: string
   section: SectionId
   n: number
+  /** Último precio y producto (se ponen solos la próxima vez). */
+  price: number | null
+  product: Product | null
 }
 
 /** "Leche  semidesnatada " y "leche semidesnatada" son lo mismo (sin mayúsculas, tildes ni espacios de más). */
