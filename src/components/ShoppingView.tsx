@@ -9,6 +9,7 @@ import { eur, shoppingTotal, type Product } from '../lib/prices'
 import { BottomSheet } from './BottomSheet'
 import { ItemSheet } from './shopping/ItemSheet'
 import { ProductPicker } from './shopping/ProductPicker'
+import { CompareSheet } from './shopping/CompareSheet'
 import { CheckIcon, CloseIcon, PlusIcon } from './Icons'
 
 export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: string) => void }) {
@@ -16,7 +17,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
   const [text, setText] = useState('')
   const [section, setSection] = useState<SectionId>('super')
   const [showBought, setShowBought] = useState(false)
-  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; id: string } | { type: 'search'; q: string }>()
+  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; id: string } | { type: 'search'; q: string } | { type: 'compare' }>()
 
   const pending = items.filter((i) => !i.done)
   const bought = items.filter((i) => i.done).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0))
@@ -44,9 +45,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
   const total = shoppingTotal(items)
   const editing = sheet?.type === 'item' ? items.find((i) => i.id === sheet.id) : undefined
 
-  const grouped = SECTION_ORDER.map((s) => ({ id: s, items: pending.filter((i) => i.section === s).sort((a, b) => a.createdAt - b.createdAt) })).filter(
-    (g) => g.items.length > 0,
-  )
+  const grouped = SECTION_ORDER.map((s) => ({ id: s, items: pending.filter((i) => i.section === s).sort((a, b) => a.createdAt - b.createdAt) })).filter((g) => g.items.length > 0)
 
   return (
     <div className="space-y-5">
@@ -68,7 +67,12 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             autoComplete="off"
             className="h-11 min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-medium placeholder:text-stone-300"
           />
-          <button type="submit" disabled={!text.trim()} aria-label="Añadir" className="grid size-11 shrink-0 place-items-center rounded-xl bg-ink text-cream transition active:scale-90 disabled:opacity-20">
+          <button
+            type="submit"
+            disabled={!text.trim()}
+            aria-label="Añadir"
+            className="grid size-11 shrink-0 place-items-center rounded-xl bg-ink text-cream transition active:scale-90 disabled:opacity-20"
+          >
             <PlusIcon className="size-5" strokeWidth={2.5} />
           </button>
         </form>
@@ -116,28 +120,38 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
       ) : (
         <>
           {total.priced > 0 && (
-            <div className="flex items-center gap-3 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 text-white shadow-lg shadow-emerald-300/30">
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-bold uppercase tracking-wider opacity-90">Total aproximado</span>
-                <span className="tabular block text-3xl font-extrabold">{eur(total.total)}</span>
-              </span>
-              <span className="text-right text-xs opacity-90">
-                {total.priced === total.count ? 'Todo con precio' : `${total.priced} de ${total.count} con precio`}
-                {total.priced < total.count && <span className="block">Toca una cosa para ponérselo</span>}
-              </span>
+            <div className="rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 text-white shadow-lg shadow-emerald-300/30">
+              <div className="flex items-center gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-bold uppercase tracking-wider opacity-90">Total aproximado</span>
+                  <span className="tabular block text-3xl font-extrabold">{eur(total.total)}</span>
+                </span>
+                <span className="text-right text-xs opacity-90">
+                  {total.priced === total.count ? 'Todo con precio' : `${total.priced} de ${total.count} con precio`}
+                  {total.priced < total.count && <span className="block">Toca una cosa para ponérselo</span>}
+                </span>
+              </div>
+              <button onClick={() => openSheet({ type: 'compare' })} className="mt-3 h-10 w-full rounded-2xl bg-white/20 text-sm font-bold active:scale-[0.99]">
+                ⚖️ Comparar Mercadona y Ahorramás
+              </button>
             </div>
           )}
+          {total.priced === 0 && pending.length > 0 && (
+            <button onClick={() => openSheet({ type: 'compare' })} className="w-full rounded-2xl bg-emerald-50 py-3 text-sm font-bold text-emerald-700 active:scale-[0.99]">
+              ⚖️ ¿Dónde sale más barata la compra? Comparar Mercadona y Ahorramás
+            </button>
+          )}
           {grouped.map((g) => (
-          <section key={g.id}>
-            <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">
-              {SECTIONS[g.id].emoji} {SECTIONS[g.id].label} <span className="opacity-60">· {g.items.length}</span>
-            </h2>
-            <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
-              {g.items.map((i) => (
-                <Row key={i.id} item={i} me={me} onOpen={() => openSheet({ type: 'item', id: i.id })} />
-              ))}
-            </div>
-          </section>
+            <section key={g.id}>
+              <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">
+                {SECTIONS[g.id].emoji} {SECTIONS[g.id].label} <span className="opacity-60">· {g.items.length}</span>
+              </h2>
+              <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl bg-surface shadow-[0_4px_16px_-6px_rgba(42,34,51,0.08)]">
+                {g.items.map((i) => (
+                  <Row key={i.id} item={i} me={me} onOpen={() => openSheet({ type: 'item', id: i.id })} />
+                ))}
+              </div>
+            </section>
           ))}
         </>
       )}
@@ -171,10 +185,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
             <button onClick={() => setShowBought((v) => !v)} className="text-xs font-bold uppercase tracking-wider text-muted" aria-expanded={showBought}>
               {showBought ? '▾' : '▸'} Comprado · {bought.length}
             </button>
-            <button
-              onClick={() => clearBought(items).catch((e: Error) => onToast(e.message))}
-              className="rounded-full bg-surface px-3 py-1 text-xs font-bold text-rose-600 shadow-sm active:scale-95"
-            >
+            <button onClick={() => clearBought(items).catch((e: Error) => onToast(e.message))} className="rounded-full bg-surface px-3 py-1 text-xs font-bold text-rose-600 shadow-sm active:scale-95">
               Vaciar comprados
             </button>
           </div>
@@ -187,6 +198,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
           )}
         </section>
       )}
+      {sheet?.type === 'compare' && <CompareSheet items={items} onClose={closeSheet} onError={onToast} />}
       {editing && <ItemSheet key={editing.id} item={editing} onClose={closeSheet} onError={onToast} />}
       {sheet?.type === 'search' && (
         <BottomSheet open onClose={closeSheet} title="Añadir del súper">
@@ -213,9 +225,7 @@ function Row({ item, me, onOpen }: { item: ShoppingItem; me: PersonId; onOpen: (
         }}
         aria-label={item.done ? `Volver a poner ${item.name}` : `Marcar ${item.name} como comprado`}
         aria-pressed={item.done}
-        className={`grid size-7 shrink-0 place-items-center rounded-full border-2 transition active:scale-90 ${
-          item.done ? 'border-transparent bg-emerald-500 text-white' : 'border-stone-300'
-        }`}
+        className={`grid size-7 shrink-0 place-items-center rounded-full border-2 transition active:scale-90 ${item.done ? 'border-transparent bg-emerald-500 text-white' : 'border-stone-300'}`}
       >
         {item.done && <CheckIcon className="size-3.5 animate-pop" />}
       </button>
@@ -241,7 +251,11 @@ function Row({ item, me, onOpen }: { item: ShoppingItem; me: PersonId; onOpen: (
         )
       )}
       {item.addedBy && !item.done && <Avatar mode={item.addedBy} size="xs" />}
-      <button onClick={() => deleteShoppingItem(item.id).catch(console.error)} aria-label={`Quitar ${item.name}`} className="grid size-8 shrink-0 place-items-center rounded-full text-stone-300 active:bg-stone-100">
+      <button
+        onClick={() => deleteShoppingItem(item.id).catch(console.error)}
+        aria-label={`Quitar ${item.name}`}
+        className="grid size-8 shrink-0 place-items-center rounded-full text-stone-300 active:bg-stone-100"
+      >
         <CloseIcon className="size-4" />
       </button>
     </div>

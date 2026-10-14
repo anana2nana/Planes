@@ -81,3 +81,79 @@ export function parsePrice(s: string): number | null {
 
 /** Miniatura pequeña (las de Mercadona se piden ya recortadas). */
 export const thumb = (url: string) => (url.includes('imgix.net') ? `${url.split('?')[0]}?fit=crop&h=96&w=96` : url)
+
+// ─── Comparar Mercadona y Ahorramás ─────────────────────────────────────────
+
+/** Precio por kilo/litro/unidad ("0,94 €/L" → { v: 0.94, unit: 'l' }), para comparar envases distintos. */
+export function refValue(p: Pick<Product, 'ref'>): { v: number; unit: string } | null {
+  const m = p.ref.match(/(\d+(?:[.,]\d+)?)\s*€\s*\/\s*(\w+)/)
+  if (!m) return null
+  const raw = m[2].toLowerCase()
+  const unit = raw.startsWith('k') ? 'kg' : raw === 'l' || raw.startsWith('lit') ? 'l' : raw.startsWith('u') ? 'ud' : raw
+  return { v: Number(m[1].replace(',', '.')), unit }
+}
+
+// Marcas blancas: no ayudan a buscar lo mismo en el otro súper.
+const BRANDS = ['hacendado', 'deliplus', 'bosque verde', 'compy', 'alipende', 'ahorramas', 'ahorramás', 'marca blanca']
+
+/** Qué buscar en el otro súper: sin marca blanca ni tamaños ("Leche semidesnatada Alipende 1L" → "leche semidesnatada"). */
+export function compareQuery(name: string): string {
+  let n = norm(name)
+  for (const b of BRANDS) n = n.replace(new RegExp(`\\b${norm(b)}\\b`, 'g'), ' ')
+  return n
+    .replace(/\b\d+([.,]\d+)?\s*(x\s*\d+\s*)?(l|ml|cl|g|gr|kg|ud|uds|unidades|u)?\b/g, ' ')
+    .replace(/\b(pack|brick|botella|bolsa|bote|lata|paquete|garrafa|tarrina|bandeja|de|del|la|el|con)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .slice(0, 4)
+    .join(' ')
+}
+
+/**
+ * Lo equivalente más barato entre los primeros resultados (los más parecidos): de tamaño parecido al original
+ * y por precio por kilo/litro si se sabe (en la misma unidad), si no por precio.
+ */
+export function bestMatch(candidates: Product[], like?: Product | null): Product | null {
+  const top = candidates.slice(0, 6)
+  if (!top.length) return null
+  // Sin original (solo "leche"), manda el resultado más parecido.
+  like = like ?? top[0]
+  const lr = refValue(like)
+  const pool = lr ? top.filter((p) => refValue(p)?.unit === lr.unit) : top
+  // Mismo tamaño más o menos (que un pack de 6 no compita con un brick suelto).
+  const amount = (p: Product) => p.price / (refValue(p)?.v || 1)
+  const sameSize = lr ? pool.filter((p) => Math.abs(amount(p) / amount(like) - 1) <= 0.35) : pool
+  const list = sameSize.length ? sameSize : pool.length ? pool : top
+  const key = (p: Product) => refValue(p)?.v ?? p.price
+  return [...list].sort((a, b) => key(a) - key(b))[0]
+}
+
+/** Ordenar resultados de los dos súper juntos: lo más barato por kilo/litro primero (sin precio por kilo, al final por precio). */
+export function sortByUnitPrice(list: Product[]): Product[] {
+  return [...list].sort((a, b) => {
+    const ra = refValue(a)
+    const rb = refValue(b)
+    if (ra && rb && ra.unit === rb.unit) return ra.v - rb.v
+    if (ra && !rb) return -1
+    if (!ra && rb) return 1
+    return a.price - b.price
+  })
+}
+
+export interface CompareRow {
+  key: string
+  qty: number
+  mercadona: Product | null
+  ahorramas: Product | null
+}
+
+/** Totales: todo en uno, todo en el otro y cada cosa donde es más barata (solo con lo que está en los dos). */
+export function compareTotals(rows: CompareRow[]) {
+  const both = rows.filter((r) => r.mercadona && r.ahorramas)
+  const sum = (f: (r: CompareRow) => number) => Math.round(both.reduce((s, r) => s + f(r) * r.qty, 0) * 100) / 100
+  const mercadona = sum((r) => r.mercadona!.price)
+  const ahorramas = sum((r) => r.ahorramas!.price)
+  const mixed = sum((r) => Math.min(r.mercadona!.price, r.ahorramas!.price))
+  return { compared: both.length, mercadona, ahorramas, mixed, cheaper: mercadona === ahorramas ? null : mercadona < ahorramas ? ('mercadona' as const) : ('ahorramas' as const) }
+}

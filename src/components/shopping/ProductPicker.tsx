@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { STORES, eur, searchCatalog, thumb, type Product, type Store } from '../../lib/prices'
+import { STORES, eur, searchCatalog, sortByUnitPrice, thumb, type Product, type Store } from '../../lib/prices'
 import { downloadMercadona, loadMercadona, searchAhorramas, type Catalog } from '../../services/prices'
 
 const KEY = 'nitakitos.shop.store'
-const readStore = (): Store => {
+type Tab = Store | 'both'
+const readStore = (): Tab => {
   try {
-    return localStorage.getItem(KEY) === 'ahorramas' ? 'ahorramas' : 'mercadona'
+    const v = localStorage.getItem(KEY)
+    return v === 'ahorramas' || v === 'both' ? v : 'mercadona'
   } catch {
     return 'mercadona'
   }
@@ -14,7 +16,7 @@ const dayFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeri
 
 /** Elegir un producto de Mercadona o Ahorramás (con su precio). */
 export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p: Product) => void }) {
-  const [store, setStore] = useState<Store>(readStore)
+  const [store, setStore] = useState<Tab>(readStore)
   const [q, setQ] = useState(initial)
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [state, setState] = useState<'idle' | 'loading' | 'downloading' | 'error'>('idle')
@@ -22,7 +24,7 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
   const [remote, setRemote] = useState<{ q: string; items: Product[] } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const pickStore = (s: Store) => {
+  const pickStore = (s: Tab) => {
     setStore(s)
     try {
       localStorage.setItem(KEY, s)
@@ -32,7 +34,7 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
   }
 
   useEffect(() => {
-    if (store !== 'mercadona' || catalog) return
+    if (store === 'ahorramas' || catalog) return
     setState('loading')
     loadMercadona()
       .then((c) => {
@@ -47,7 +49,7 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
 
   // Ahorramás: se busca en su web al dejar de escribir.
   useEffect(() => {
-    if (store !== 'ahorramas') return
+    if (store === 'mercadona') return
     const query = q.trim()
     if (query.length < 2 || remote?.q === query) return
     if (timer.current) clearTimeout(timer.current)
@@ -82,14 +84,17 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
       })
   }
 
-  const results = store === 'mercadona' ? searchCatalog(catalog?.items ?? [], q) : remote?.q === q.trim() ? remote.items : []
+  const local = searchCatalog(catalog?.items ?? [], q)
+  const online = remote?.q === q.trim() ? remote.items : []
+  // "Los dos": juntos y por precio por kilo/litro (lo más barato primero).
+  const results = store === 'mercadona' ? local : store === 'ahorramas' ? online : sortByUnitPrice([...local.slice(0, 20), ...online.slice(0, 20)])
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-stone-100 p-1" role="tablist" aria-label="Supermercado">
-        {(Object.keys(STORES) as Store[]).map((s) => (
+      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-stone-100 p-1" role="tablist" aria-label="Supermercado">
+        {(['mercadona', 'ahorramas', 'both'] as Tab[]).map((s) => (
           <button key={s} role="tab" aria-selected={store === s} onClick={() => pickStore(s)} className={`h-9 rounded-xl text-sm font-bold ${store === s ? 'bg-surface shadow-sm' : 'text-muted'}`}>
-            {STORES[s].label}
+            {s === 'both' ? '⚖️ Comparar' : STORES[s].label}
           </button>
         ))}
       </div>
@@ -102,7 +107,7 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
         className="h-11 w-full rounded-xl border border-stone-200 bg-surface px-3 font-semibold outline-none focus:border-both"
       />
 
-      {store === 'mercadona' && catalog && catalog.items.length === 0 && state !== 'downloading' && (
+      {store !== 'ahorramas' && catalog && catalog.items.length === 0 && state !== 'downloading' && (
         <div className="space-y-2 rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-800">
           <p>Aún no está descargado el catálogo de Mercadona. Se actualiza solo cada lunes; la primera vez hay que pedirlo.</p>
           <button onClick={download} className="rounded-xl bg-emerald-600 px-3 py-2 font-bold text-white">
@@ -111,17 +116,17 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
         </div>
       )}
       {state === 'downloading' && <p className="rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Descargando el catálogo de Mercadona… tarda uno o dos minutos ☕</p>}
-      {state === 'loading' && <p className="text-sm text-muted">{store === 'ahorramas' ? 'Buscando en Ahorramás…' : 'Cargando el catálogo…'}</p>}
+      {state === 'loading' && <p className="text-sm text-muted">{store !== 'mercadona' && catalog ? 'Buscando en Ahorramás… (tarda unos segundos)' : 'Cargando…'}</p>}
       {state === 'error' && (
         <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">
-          {STORES[store].label} no responde ahora mismo. Puedes poner el precio a mano.
+          {store === 'both' ? 'Uno de los súper' : STORES[store].label} no responde ahora mismo. Puedes poner el precio a mano.
           <span className="mt-1 block text-xs opacity-70">{error}</span>
         </p>
       )}
 
       {results.length > 0 ? (
         <ul className="divide-y divide-stone-100 overflow-hidden rounded-2xl bg-surface">
-          {results.map((p) => (
+          {results.map((p, i) => (
             <li key={`${p.store}-${p.id}`}>
               <button onClick={() => onPick(p)} className="flex w-full items-center gap-3 px-3 py-2 text-left active:bg-stone-50">
                 {p.image ? (
@@ -130,6 +135,12 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
                   <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-stone-100">🛒</span>
                 )}
                 <span className="min-w-0 flex-1">
+                  {store === 'both' && (
+                    <span className="flex items-center gap-1">
+                      <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${STORES[p.store].color}`}>{STORES[p.store].label}</span>
+                      {i === 0 && results.length > 1 && <span className="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-bold text-amber-800">Más barato</span>}
+                    </span>
+                  )}
                   <span className="line-clamp-2 text-sm font-semibold leading-snug">{p.name}</span>
                   <span className="block text-xs text-muted">{[p.pack, p.ref].filter(Boolean).join(' · ')}</span>
                 </span>
@@ -141,7 +152,7 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
       ) : (
         q.trim().length >= 2 &&
         state === 'idle' &&
-        (store === 'ahorramas' ? remote?.q === q.trim() : (catalog?.items.length ?? 0) > 0) && (
+        (store === 'mercadona' ? (catalog?.items.length ?? 0) > 0 : remote?.q === q.trim()) && (
           <p className="p-2 text-center text-sm text-muted">No hay nada con «{q.trim()}». Prueba con otra palabra.</p>
         )
       )}
@@ -151,6 +162,7 @@ export function ProductPicker({ initial, onPick }: { initial: string; onPick: (p
         </p>
       )}
       {store === 'ahorramas' && <p className="text-center text-[11px] text-muted">Precios de la web de Ahorramás · pueden variar en tienda</p>}
+      {store === 'both' && <p className="text-center text-[11px] text-muted">Ordenado por precio por kilo o litro (lo que de verdad sale más barato)</p>}
     </div>
   )
 }
