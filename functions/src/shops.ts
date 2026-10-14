@@ -89,6 +89,7 @@ const priceIn = (s: string): number | null => {
   const m = s.match(/(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:€|&euro;|EUR)/) ?? s.match(/content=["'](\d{1,4}(?:\.\d{1,2})?)["']/)
   return m ? num(m[1]) : null
 }
+const unitName = (u: string) => (({ kilo: 'kg', litro: 'L', l: 'L', unidad: 'ud' }) as Record<string, string>)[u.toLowerCase()] ?? u.toLowerCase()
 const absolute = (src: string) => (src.startsWith('//') ? `https:${src}` : src.startsWith('/') ? `https://www.ahorramas.com${src}` : src)
 
 /** Productos de una página de búsqueda de Ahorramás: datos estructurados (JSON-LD) y, si no, las fichas del listado. */
@@ -129,17 +130,26 @@ export function parseAhorramas(html: string): ShopProduct[] {
   for (const tile of parts) {
     const id = tile.match(/data-pid=["']([^"']+)["']/i)?.[1]
     if (!id) continue
-    const chunk = tile.slice(0, 6000)
-    // Los datos de analítica (data-gtm / data-product) suelen traer nombre y precio limpios.
+    // Toda la ficha (hasta la siguiente), sin comentarios HTML (Ahorramás deja datos viejos comentados).
+    const chunk = tile.slice(0, 40000).replace(/<!--[\s\S]*?-->/g, '')
     let name = ''
     let price: number | null = null
-    const gtm = chunk.match(/data-(?:gtm|gtm-info|product|impression)[\w-]*=["']([^"']*(?:&quot;|")name(?:&quot;|")[^"']*)["']/i)?.[1]
-    if (gtm) {
+    // Datos de analítica: en Ahorramás, data-gtm-layer="%7B%22id%22…" (JSON codificado como URL); en otras, JSON con &quot;.
+    for (const m of chunk.matchAll(/data-(?:gtm|product|impression)[\w-]*=["']([^"']+)["']/gi)) {
+      let raw = decode(m[1])
+      if (/^%7B/i.test(raw)) {
+        try {
+          raw = decodeURIComponent(raw)
+        } catch {
+          continue
+        }
+      }
+      if (!raw.startsWith('{')) continue
       try {
-        const g = JSON.parse(decode(gtm))
-        const item = g?.ecommerce?.items?.[0] ?? g?.items?.[0] ?? g
-        name = typeof (item?.item_name ?? item?.name) === 'string' ? (item.item_name ?? item.name) : ''
-        price = num(item?.price)
+        const g = JSON.parse(raw)
+        const item = g?.ecommerce?.items?.[0] ?? g?.ecommerce?.click?.products?.[0] ?? g?.ecommerce?.impressions?.[0] ?? g?.items?.[0] ?? g
+        if (!name && typeof (item?.item_name ?? item?.name) === 'string') name = (item.item_name ?? item.name).trim()
+        if (price === null) price = num(item?.price)
       } catch {
         /* sigue con el HTML */
       }
@@ -153,15 +163,24 @@ export function parseAhorramas(html: string): ShopProduct[] {
         ''
       name = clean(n)
     }
-    if (price === null) {
-      const sales = chunk.match(/class=["'][^"']*(?:sales|price-value|value|product-price)[^"']*["'][^>]*>([\s\S]{0,200}?)<\//i)?.[0] ?? ''
-      price = priceIn(sales) ?? priceIn(chunk)
+    if (price === null || !(price > 0)) {
+      // El bloque del precio: desde class="price" hasta el precio por kilo/litro (que no es el del envase).
+      const at = chunk.search(/class=["'][^"']*\b(?:price|sales|product-price)\b[^"']*["']/i)
+      if (at >= 0) {
+        let block = chunk.slice(at, at + 2500)
+        const unitAt = block.search(/unit-price|precio-unidad|price-per-unit/i)
+        if (unitAt > 0) block = block.slice(0, unitAt)
+        price = priceIn(block) ?? num(block.match(/content=["'](\d{1,4}(?:\.\d{1,2})?)["']/)?.[1]) ?? num(clean(block).match(/(\d{1,4}[.,]\d{2})/)?.[1])
+      }
     }
     const ref = chunk.match(/(\d{1,4}[.,]\d{2})\s*(?:€|&euro;)\s*\/\s*(kg|kilo|l|litro|ud|unidad|docena)\b/i)
-    const pack = clean(chunk.match(/class=["'][^"']*(?:unit|format|size|grammage|weight)[^"']*["'][^>]*>([^<]{1,40})</i)?.[1] ?? '')
-    const img = chunk.match(/<img[^>]+(?:data-src|src)=["']([^"']+\.(?:jpe?g|png|webp)[^"']*)["']/i)?.[1] ?? ''
-    if (price !== null)
-      add({ id, name, pack: /\d/.test(pack) && !/€/.test(pack) ? pack : '', price, ref: ref ? `${euro(num(ref[1])!)} €/${ref[2].toLowerCase()}` : '', image: img ? absolute(decode(img)) : '' })
+    const pack = clean(chunk.match(/class=["'][^"']*(?:format|size|grammage|weight)[^"']*["'][^>]*>([^<]{1,40})</i)?.[1] ?? '')
+    const img =
+      chunk.match(/<img[^>]+class=["'][^"']*tile-image[^"']*["'][^>]*?\s(?:data-src|src)=["']([^"']+)["']/i)?.[1] ??
+      chunk.match(/<img[^>]+(?:data-src|src)=["']([^"']+\.(?:jpe?g|png|webp)[^"']*)["']/i)?.[1] ??
+      ''
+    if (price !== null && price > 0)
+      add({ id, name, pack: /\d/.test(pack) && !/€/.test(pack) ? pack : '', price, ref: ref ? `${euro(num(ref[1])!)} €/${unitName(ref[2])}` : '', image: img ? absolute(decode(img)) : '' })
   }
   return [...out.values()]
 }

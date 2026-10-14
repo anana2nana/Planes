@@ -490,8 +490,10 @@ export const shopSearch = onCall({ timeoutSeconds: 30 }, async (req) => {
         lastError = `${res.status}`
         continue
       }
-      items = parseAhorramas(await res.text()).slice(0, 40)
+      const html = await res.text()
+      items = parseAhorramas(html).slice(0, 40)
       if (items.length) break
+      lastError = `estado ${res.status}, ${html.length} letras, ${html.split('data-pid=').length - 1} fichas en ${url}`
     } catch (e) {
       lastError = (e as Error).message
     }

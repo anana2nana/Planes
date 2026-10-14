@@ -533,7 +533,7 @@ test('Ahorramás: JSON-LD o fichas del listado', () => {
     </div></div>
     <div class="product" data-pid="70001"><div class="product-tile">
       <a class="pdp-link" href="/pan.html"><span>Pan de molde</span> integral</a>
-      <div class="price"><span class="sales">1,15 €</span></div><span class="unit">450 g</span>
+      <div class="price"><span class="sales">1,15 €</span></div><span class="format">450 g</span>
     </div></div>
     <div class="product" data-pid="80000"><a class="pdp-link">Sin precio</a></div>
   </div>`
@@ -544,4 +544,17 @@ test('Ahorramás: JSON-LD o fichas del listado', () => {
   assert.equal(t[1].price, 1.15)
   assert.equal(t[1].pack, '450 g')
   assert.deepEqual(parseAhorramas('<html>nada</html>'), [])
+  // Como la web real de Ahorramás (oct 2026)
+  const gtmLayer = encodeURIComponent(JSON.stringify({ id: '70865', name: 'Leche semidesnatada Alipende 1L', price: 0.83, brand: 'ALIPENDE' }))
+  const real = `<script type="application/ld+json">{"@type":"Organization","name":"Ahorramas"}</script>
+  <div class="product" data-pid="70865">     <div class="product-tile " data-brand="ALIPENDE" data-index="1" data-category1="L&aacute;cteos" data-category2="Leche">
+   <!-- dwMarker="product" dwContentID="d5c45" --> <div class="image-container d-flex align-items-center"> <div class="promotions-container d-flex flex-column"> <div class="tile-promotions"> </div> </div>
+   ${'<div class="wishlist-container"> <a class="wishlistTile wishlist-link d-flex" href="/on/demandware.store/Sites-Ahorramas-Site/es/Wishlist-AddProduct"><span class="wishlist-link-text js-wish" title="Mi lista"></span></a></div>'.repeat(20)}
+   <a href="/leche-semidesnatada-alipende-1l-70865.html" class="product-pdp-link " data-gtm-layer="${gtmLayer}"><img class="tile-image" src="https://www.ahorramas.com/dw/image/v2/BFNH_PRD/on/demandware.static/-/Sites-ahorramas-master/default/dw1cfa46e2/Assets/070865_C1C1/large" alt="Leche semidesnatada Alipende 1L"/></a> </div>
+   <div class="tile-body"> <div class="price"> <div class="price"> <span class="sales"> <span class="value"> 0,83 &euro; </span> </span> </div> <div class="unit-price-row price"> <!-- <span class="unit-price-per-unit gray">1.0 Kg</span> --> <span class="unit-price-per-unit grey"> 0,83&euro;/LITRO</span> </div> </div>
+   <a href="/leche-semidesnatada-alipende-1l-70865.html" class="product-pdp-link " data-gtm-layer="${gtmLayer}"><h2 class="link product-name-gtm" data-brand="ALIPENDE">Leche semidesnatada Alipende 1L</h2></a> </div></div>
+  <div class="product" data-pid="70866"><div class="product-tile"><div class="price"><span class="sales"><span class="value">1,05 &euro;</span></span></div><div class="unit-price-row price"><span class="unit-price-per-unit grey"> 1,05&euro;/LITRO</span></div><h2 class="link product-name-gtm">Leche entera Alipende 1L</h2></div></div>`
+  const r = parseAhorramas(real)
+  assert.deepEqual(r[0], { store: 'ahorramas', id: '70865', name: 'Leche semidesnatada Alipende 1L', pack: '', price: 0.83, ref: '0,83 €/L', image: 'https://www.ahorramas.com/dw/image/v2/BFNH_PRD/on/demandware.static/-/Sites-ahorramas-master/default/dw1cfa46e2/Assets/070865_C1C1/large' })
+  assert.deepEqual([r[1].name, r[1].price, r[1].ref], ['Leche entera Alipende 1L', 1.05, '1,05 €/L'])
 })
