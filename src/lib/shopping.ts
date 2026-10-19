@@ -1,4 +1,4 @@
-import type { Product } from './prices.ts'
+import type { Options, Product } from './prices.ts'
 
 export type SectionId = 'super' | 'fresco' | 'deco' | 'farmacia' | 'gata' | 'otros'
 
@@ -24,8 +24,10 @@ export interface ShoppingItem {
   price: number | null
   /** Cuántas (para el total). */
   qty: number
-  /** Producto elegido en Mercadona o Ahorramás. */
+  /** Producto elegido para comprar (el de Mercadona o el de Ahorramás). */
   product: Product | null
+  /** Lo elegido a mano en cada súper, para comparar. */
+  options: Options
 }
 
 /** Lo que soléis comprar (para las sugerencias): veces y última sección usada. */
@@ -37,6 +39,7 @@ export interface Frequent {
   /** Último precio y producto (se ponen solos la próxima vez). */
   price: number | null
   product: Product | null
+  options: Options
 }
 
 /** "Leche  semidesnatada " y "leche semidesnatada" son lo mismo (sin mayúsculas, tildes ni espacios de más). */

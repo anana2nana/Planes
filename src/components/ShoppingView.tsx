@@ -5,7 +5,7 @@ import type { PersonId } from '../lib/types'
 import { addShoppingItem, clearBought, deleteShoppingItem, toggleShoppingItem } from '../services/shopping'
 import { Avatar } from './Avatar'
 import { useSheetState } from '../hooks/useSheetState'
-import { eur, shoppingTotal, type Product } from '../lib/prices'
+import { eur, shoppingTotal, type Product, type Store } from '../lib/prices'
 import { BottomSheet } from './BottomSheet'
 import { ItemSheet } from './shopping/ItemSheet'
 import { ProductPicker } from './shopping/ProductPicker'
@@ -17,7 +17,7 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
   const [text, setText] = useState('')
   const [section, setSection] = useState<SectionId>('super')
   const [showBought, setShowBought] = useState(false)
-  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; id: string } | { type: 'search'; q: string } | { type: 'compare' }>()
+  const [sheet, openSheet, closeSheet] = useSheetState<{ type: 'item'; id: string; pick?: Store; back?: boolean } | { type: 'search'; q: string } | { type: 'compare' }>()
 
   const pending = items.filter((i) => !i.done)
   const bought = items.filter((i) => i.done).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0))
@@ -35,7 +35,11 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
     if (!name.trim()) return
     // Con producto elegido, su precio; si no, el de la última vez.
     const last = frequent.find((f) => f.key === itemKey(name))
-    const extra = product ? { price: product.price, product } : last?.price != null ? { price: last.price, product: last.product } : {}
+    const extra = product
+      ? { price: product.price, product, options: { ...last?.options, [product.store]: product } }
+      : last?.price != null || Object.keys(last?.options ?? {}).length
+        ? { price: last!.price, product: last!.product, options: last!.options }
+        : {}
     const ok = addShoppingItem(name, sec, me, items, extra)
     if (!ok) onToast(`«${name.trim()}» ya está en la lista`)
     else navigator.vibrate?.(8)
@@ -198,8 +202,10 @@ export function ShoppingView({ me, onToast }: { me: PersonId; onToast: (m: strin
           )}
         </section>
       )}
-      {sheet?.type === 'compare' && <CompareSheet items={items} onClose={closeSheet} onError={onToast} />}
-      {editing && <ItemSheet key={editing.id} item={editing} onClose={closeSheet} onError={onToast} />}
+      {sheet?.type === 'compare' && <CompareSheet items={items} onClose={closeSheet} onError={onToast} onChoose={(item, store) => openSheet({ type: 'item', id: item.id, pick: store, back: true })} />}
+      {editing && sheet?.type === 'item' && (
+        <ItemSheet key={`${editing.id}-${sheet.pick ?? ''}`} item={editing} startPicking={sheet.pick} onClose={() => (sheet.back ? openSheet({ type: 'compare' }) : closeSheet())} onError={onToast} />
+      )}
       {sheet?.type === 'search' && (
         <BottomSheet open onClose={closeSheet} title="Añadir del súper">
           <ProductPicker
