@@ -24,7 +24,7 @@ export function parseOpenLibrary(json: unknown): CoverHit[] {
 /** Respuesta de la API de Wikipedia (generator=search + pageimages + description). */
 export function parseWikipedia(json: unknown, kind: MediaKind): CoverHit[] {
   const pages = Object.values((json as { query?: { pages?: Record<string, { title: string; index?: number; description?: string; thumbnail?: { source: string } }> } })?.query?.pages ?? {})
-  const want = kind === 'serie' ? /series|serie|sitcom|miniserie|programa/i : kind === 'docu' ? /document/i : kind === 'peli' ? /film|película|pel·lícula|movie/i : /./
+  const want = kind === 'serie' ? /series|serie|sitcom|miniserie|programa/i : kind === 'docu' ? /document/i : kind === 'peli' ? /film|película|pel·lícula|movie/i : kind === 'juego' ? /video ?game|videojuego|juego/i : /./
   return pages
     .filter((p) => p.thumbnail?.source && (!p.description || want.test(p.description)))
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
@@ -35,7 +35,7 @@ export function parseWikipedia(json: unknown, kind: MediaKind): CoverHit[] {
     }))
 }
 
-const HINT: Partial<Record<MediaKind, string>> = { peli: 'film', serie: 'TV series', docu: 'documentary' }
+const HINT: Partial<Record<MediaKind, string>> = { peli: 'film', serie: 'TV series', docu: 'documentary', juego: 'video game' }
 
 async function getJson(url: string, signal?: AbortSignal) {
   const r = await fetch(url, { signal })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { avgRating, disagreement, isMediaLink, mediaFromShare, roulettePool, sortMedia, yearStats, type Media } from '../src/lib/media.ts'
+import { avgRating, disagreement, starsText, isMediaLink, mediaFromShare, roulettePool, sortMedia, yearStats, type Media } from '../src/lib/media.ts'
 import { parseOpenLibrary, parseWikipedia } from '../src/lib/covers.ts'
 
 const m = (o: Partial<Media>): Media => ({
@@ -80,4 +80,17 @@ test('portadas: respuestas de Open Library y Wikipedia', () => {
   }
   assert.deepEqual(parseWikipedia(wiki, 'peli'), [{ title: 'Interstellar', subtitle: '2014 film by Christopher Nolan', image: 'a.jpg' }])
   assert.deepEqual(parseWikipedia({}, 'serie'), [])
+})
+
+test('hemeroteca: videojuegos y medias estrellas', () => {
+  assert.equal(avgRating(m({ rating: { nita: 4.5, kitos: 3 } })), 3.75)
+  assert.equal(disagreement(m({ rating: { nita: 4.5, kitos: 0.5 } })), 4)
+  assert.equal(starsText(4.5), '4,5')
+  assert.equal(starsText(3.75), '3,8')
+  assert.equal(starsText(5), '5')
+  assert.ok(isMediaLink('https://store.steampowered.com/app/1145360/Hades/'))
+  assert.ok(isMediaLink('https://www.nintendo.com/es-es/Juegos/Nintendo-Switch/zelda.html'))
+  assert.deepEqual(mediaFromShare('Hades on Steam', 'https://store.steampowered.com/app/1145360/Hades/'), { title: 'Hades', subtitle: '', kind: 'juego' })
+  assert.deepEqual(mediaFromShare('Ahorra 50% en Hollow Knight en Steam', 'https://store.steampowered.com/app/367520/'), { title: 'Hollow Knight', subtitle: '', kind: 'juego' })
+  assert.deepEqual(mediaFromShare('Astro Bot | PlayStation (España)', 'https://www.playstation.com/es-es/games/astro-bot/'), { title: 'Astro Bot', subtitle: '', kind: 'juego' })
 })

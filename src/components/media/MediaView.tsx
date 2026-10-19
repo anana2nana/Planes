@@ -4,7 +4,7 @@ import { removeItem } from '../../hooks/useList'
 import { useSheetState } from '../../hooks/useSheetState'
 import { searchCovers, type CoverHit } from '../../lib/covers'
 import { compressImage } from '../../lib/image'
-import { MEDIA_KINDS, MEDIA_ORDER, STATUS, WHERE, avgRating, roulettePool, sortMedia, yearStats, type Media, type MediaKind, type MediaStatus } from '../../lib/media'
+import { MEDIA_KINDS, MEDIA_ORDER, STATUS, WHERE, avgRating, roulettePool, sortMedia, starsText, yearStats, type Media, type MediaKind, type MediaStatus } from '../../lib/media'
 import { PEOPLE } from '../../lib/people'
 import type { PersonId } from '../../lib/types'
 import { BottomSheet } from '../BottomSheet'
@@ -120,7 +120,7 @@ function MediaCard({ m, onOpen }: { m: Media; onOpen: () => void }) {
     <button onClick={onOpen} className="text-left active:scale-[0.97]" aria-label={m.title}>
       <div className="relative">
         <Cover m={m} className="shadow-[0_4px_16px_-6px_rgba(42,34,51,0.15)]" />
-        {avg !== null && <span className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">★ {avg.toLocaleString('es-ES', { maximumFractionDigits: 1 })}</span>}
+        {avg !== null && <span className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">★ {starsText(avg)}</span>}
         {m.status === 'doing' && m.progress && <span className="absolute inset-x-1.5 bottom-1.5 truncate rounded-full bg-black/60 px-2 py-0.5 text-center text-[10px] font-bold text-white">{m.progress}</span>}
       </div>
       <p className="mt-1 line-clamp-2 text-xs font-bold leading-tight">{m.title}</p>
@@ -199,26 +199,49 @@ function YearCard({ items }: { items: Media[] }) {
       <p className="text-sm text-muted">{s.byKind.map((k) => `${MEDIA_KINDS[k.kind].emoji} ${k.n} ${(k.n === 1 ? MEDIA_KINDS[k.kind].label : MEDIA_KINDS[k.kind].plural).toLowerCase()}`).join(' · ')}</p>
       {s.best && (
         <p className="mt-2 text-sm">
-          🏆 La mejor: <b>{s.best.title}</b> (★ {avgRating(s.best)!.toLocaleString('es-ES', { maximumFractionDigits: 1 })})
+          🏆 La mejor: <b>{s.best.title}</b> (★ {starsText(avgRating(s.best)!)})
         </p>
       )}
       {s.argued && (
         <p className="text-sm">
-          🥊 La que más discutisteis: <b>{s.argued.title}</b> ({PEOPLE.nita.name} {s.argued.rating.nita} · {PEOPLE.kitos.name} {s.argued.rating.kitos})
+          🥊 La que más discutisteis: <b>{s.argued.title}</b> ({PEOPLE.nita.name} {starsText(s.argued.rating.nita!)} · {PEOPLE.kitos.name} {starsText(s.argued.rating.kitos!)})
         </p>
       )}
     </div>
   )
 }
 
+/** Cinco estrellas que se pueden poner a medias (como puntuar sobre 10). Tocar la nota que ya hay la quita. */
 function Stars({ value, onChange, label }: { value: number | null; onChange: (v: number | null) => void; label: string }) {
   return (
-    <div className="flex gap-0.5" role="radiogroup" aria-label={label}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={`${n} ${n === 1 ? 'estrella' : 'estrellas'}`} onClick={() => onChange(value === n ? null : n)} className={`text-2xl leading-none ${value && n <= value ? 'text-amber-400' : 'text-stone-300'}`}>
-          ★
-        </button>
-      ))}
+    <div className="flex items-center gap-2">
+      <div className="flex" role="radiogroup" aria-label={label}>
+        {[1, 2, 3, 4, 5].map((n) => {
+          const fill = value === null ? 0 : value >= n ? 1 : value >= n - 0.5 ? 0.5 : 0
+          return (
+            <span key={n} className="relative block size-8 text-[28px] leading-8">
+              <span className="absolute inset-0 text-center text-stone-300" aria-hidden>
+                ★
+              </span>
+              <span className="absolute inset-y-0 left-0 overflow-hidden text-amber-400" style={{ width: `${fill * 100}%` }} aria-hidden>
+                <span className="block w-8 text-center">★</span>
+              </span>
+              {[n - 0.5, n].map((v, i) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={value === v}
+                  aria-label={`${starsText(v)} ${v === 1 ? 'estrella' : 'estrellas'}`}
+                  onClick={() => onChange(value === v ? null : v)}
+                  className={`absolute inset-y-0 w-1/2 ${i ? 'right-0' : 'left-0'}`}
+                />
+              ))}
+            </span>
+          )
+        })}
+      </div>
+      <span className="tabular w-7 text-right text-sm font-bold text-muted">{value !== null ? starsText(value) : ''}</span>
     </div>
   )
 }
@@ -325,7 +348,7 @@ export function MediaSheet({ draft, me, onClose, onError, onSaved }: { draft: Me
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <input autoFocus={!isEdit} value={d.title} onChange={(e) => set({ title: e.target.value })} placeholder={d.kind === 'libro' ? 'Título del libro' : 'Título'} aria-label="Título" maxLength={120} className="w-full border-0 border-b-2 border-stone-100 bg-transparent py-1.5 text-lg font-bold outline-none placeholder:text-stone-300 focus:border-both" style={{ fontSize: 18 }} />
-            <input value={d.subtitle} onChange={(e) => set({ subtitle: e.target.value })} placeholder={d.kind === 'libro' ? 'Autor' : 'Año, director…'} aria-label="Detalle" maxLength={120} className={`${input} h-10 text-sm font-medium`} />
+            <input value={d.subtitle} onChange={(e) => set({ subtitle: e.target.value })} placeholder={d.kind === 'libro' ? 'Autor' : d.kind === 'juego' ? 'Año, estudio…' : 'Año, director…'} aria-label="Detalle" maxLength={120} className={`${input} h-10 text-sm font-medium`} />
           </div>
         </div>
 
@@ -351,8 +374,8 @@ export function MediaSheet({ draft, me, onClose, onError, onSaved }: { draft: Me
           ))}
         </div>
 
-        {d.status === 'doing' && (d.kind === 'serie' || d.kind === 'libro') && (
-          <input value={d.progress} onChange={(e) => set({ progress: e.target.value })} placeholder={d.kind === 'libro' ? 'Por dónde vais: pág. 120' : 'Por dónde vais: T2 E5'} aria-label="Por dónde vais" maxLength={40} className={input} />
+        {d.status === 'doing' && (d.kind === 'serie' || d.kind === 'libro' || d.kind === 'juego') && (
+          <input value={d.progress} onChange={(e) => set({ progress: e.target.value })} placeholder={d.kind === 'libro' ? 'Por dónde vais: pág. 120' : d.kind === 'juego' ? 'Por dónde vais: capítulo 3, 40 %…' : 'Por dónde vais: T2 E5'} aria-label="Por dónde vais" maxLength={40} className={input} />
         )}
 
         {d.status === 'done' && (
@@ -368,7 +391,7 @@ export function MediaSheet({ draft, me, onClose, onError, onSaved }: { draft: Me
         )}
 
         <div className="space-y-2">
-          <input value={d.where} onChange={(e) => set({ where: e.target.value })} list="media-where" placeholder={d.kind === 'libro' ? 'Formato: papel, Kindle…' : 'Dónde: Netflix, cine…'} aria-label="Dónde" maxLength={40} className={input} />
+          <input value={d.where} onChange={(e) => set({ where: e.target.value })} list="media-where" placeholder={d.kind === 'libro' ? 'Formato: papel, Kindle…' : d.kind === 'juego' ? 'Dónde: PlayStation, Switch, PC…' : 'Dónde: Netflix, cine…'} aria-label="Dónde" maxLength={40} className={input} />
           <datalist id="media-where">
             {WHERE.map((w) => (
               <option key={w} value={w} />

@@ -2,23 +2,24 @@
 
 import type { PersonId } from './types'
 
-export type MediaKind = 'peli' | 'serie' | 'libro' | 'docu' | 'teatro' | 'concierto' | 'otro'
+export type MediaKind = 'peli' | 'serie' | 'libro' | 'juego' | 'docu' | 'teatro' | 'concierto' | 'otro'
 export type MediaStatus = 'want' | 'doing' | 'done'
 
 export const MEDIA_KINDS: Record<MediaKind, { label: string; plural: string; emoji: string; doing: string; done: string }> = {
   peli: { label: 'Peli', plural: 'Pelis', emoji: '🎬', doing: 'Viendo', done: 'Vista' },
   serie: { label: 'Serie', plural: 'Series', emoji: '📺', doing: 'Viendo', done: 'Vista' },
   libro: { label: 'Libro', plural: 'Libros', emoji: '📚', doing: 'Leyendo', done: 'Leído' },
+  juego: { label: 'Videojuego', plural: 'Videojuegos', emoji: '🎮', doing: 'Jugando', done: 'Terminado' },
   docu: { label: 'Documental', plural: 'Documentales', emoji: '🎥', doing: 'Viendo', done: 'Visto' },
   teatro: { label: 'Teatro', plural: 'Teatro', emoji: '🎭', doing: 'Con entradas', done: 'Visto' },
   concierto: { label: 'Concierto', plural: 'Conciertos', emoji: '🎤', doing: 'Con entradas', done: 'Visto' },
   otro: { label: 'Otro', plural: 'Otros', emoji: '✨', doing: 'En marcha', done: 'Hecho' },
 }
 export const MEDIA_ORDER = Object.keys(MEDIA_KINDS) as MediaKind[]
-export const STATUS: Record<MediaStatus, { label: string }> = { want: { label: 'Pendientes' }, doing: { label: 'En marcha' }, done: { label: 'Vistas' } }
+export const STATUS: Record<MediaStatus, { label: string }> = { want: { label: 'Pendientes' }, doing: { label: 'En marcha' }, done: { label: 'Terminadas' } }
 
 /** Dónde se ve (sugerencias; se puede escribir otro). */
-export const WHERE = ['Netflix', 'HBO Max', 'Prime Video', 'Disney+', 'Movistar+', 'Filmin', 'Apple TV+', 'SkyShowtime', 'RTVE Play', 'Atresplayer', 'Cine', 'Kindle', 'Papel', 'Audible', 'Biblioteca']
+export const WHERE = ['Netflix', 'HBO Max', 'Prime Video', 'Disney+', 'Movistar+', 'Filmin', 'Apple TV+', 'SkyShowtime', 'RTVE Play', 'Atresplayer', 'Cine', 'Kindle', 'Papel', 'Audible', 'Biblioteca', 'PlayStation', 'Nintendo Switch', 'Xbox', 'PC (Steam)', 'Móvil']
 
 export interface Media {
   id: string
@@ -39,11 +40,14 @@ export interface Media {
   createdAt: number
 }
 
-/** Media de las notas que haya (1 a 5), o null. */
+/** Media de las notas que haya (de 0,5 a 5 estrellas, de media en media), o null. */
 export function avgRating(m: Pick<Media, 'rating'>): number | null {
   const r = [m.rating.nita, m.rating.kitos].filter((x): x is number => typeof x === 'number' && x > 0)
   return r.length ? r.reduce((a, b) => a + b, 0) / r.length : null
 }
+
+/** "4,5" (las notas van de media en media estrella: es como puntuar sobre 10). */
+export const starsText = (v: number) => v.toLocaleString('es-ES', { maximumFractionDigits: 1 })
 
 /** Diferencia entre las notas de los dos (solo si los dos la han puntuado). */
 export function disagreement(m: Pick<Media, 'rating'>): number | null {
@@ -92,10 +96,11 @@ const SOURCES: { re: RegExp; kind: MediaKind | null }[] = [
   { re: /casadellibro\.com/i, kind: 'libro' },
   { re: /todostuslibros\.com/i, kind: 'libro' },
   { re: /books\.google\./i, kind: 'libro' },
+  { re: /store\.steampowered\.com|store\.playstation\.com|playstation\.com\/[a-z-]+\/games|nintendo\.(com|es)|xbox\.com|howlongtobeat\.com|metacritic\.com\/game|igdb\.com|epicgames\.com/i, kind: 'juego' },
   { re: /(netflix|hbomax|max)\.com|primevideo\.com|disneyplus\.com|filmin\.es|movistarplus\.es|tv\.apple\.com/i, kind: null },
 ]
 
-/** ¿Es un enlace de pelis, series o libros? */
+/** ¿Es un enlace de pelis, series, libros o videojuegos? */
 export const isMediaLink = (url: string) => SOURCES.some((s) => s.re.test(url))
 
 /**
@@ -114,7 +119,9 @@ export function mediaFromShare(text: string, url: string): { title: string; subt
   if (/\b(documental|documentary)\b/i.test(text)) kind = 'docu'
   t = t
     .replace(/^(mira|echa un vistazo a|check out)\s+/i, '')
-    .replace(/\s*[-|–·]\s*(FilmAffinity|IMDb|Letterboxd|JustWatch|Goodreads|Casa del Libro|Netflix|Prime Video|HBO Max|Max|Disney\+|Filmin|Movistar Plus\+?)\b.*$/i, '')
+    .replace(/^(save|ahorra)\s+\d+%\s+(on|en)\s+/i, '')
+    .replace(/\s+(on|en)\s+Steam\s*$/i, '')
+    .replace(/\s*[-|–·]\s*(FilmAffinity|IMDb|Letterboxd|JustWatch|Goodreads|Casa del Libro|Netflix|Prime Video|HBO Max|Max|Disney\+|Filmin|Movistar Plus\+?|Steam|PlayStation|Nintendo|Xbox|HowLongToBeat|Metacritic|Epic Games)\b.*$/i, '')
     .replace(/\s*\((TV (Mini )?Series|Serie de TV|Miniserie de TV)[^)]*\)/i, '')
     .replace(/\s*⭐.*$/, '')
     .trim()
