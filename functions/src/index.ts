@@ -423,6 +423,18 @@ async function getJson(url: string): Promise<unknown> {
   return res.json()
 }
 
+/** Con reintentos (si su web va lenta o nos pide calma, se espera un poco y se vuelve a pedir). */
+async function getJsonRetry(url: string, tries = 4): Promise<unknown> {
+  for (let i = 1; ; i++) {
+    try {
+      return await getJson(url)
+    } catch (e) {
+      if (i >= tries) throw e
+      await sleep(1500 * i)
+    }
+  }
+}
+
 /**
  * Descarga el catálogo de Mercadona de su zona (≈ 4.000 productos, uno por subcategoría)
  * y lo guarda en unos pocos documentos `catalog/mercadona-N`. La app busca en él sin conexión.
@@ -430,25 +442,43 @@ async function getJson(url: string): Promise<unknown> {
 async function refreshMercadona(): Promise<number> {
   const wh = MERCADONA_WH.value() || 'mad1'
   const base = 'https://tienda.mercadona.es/api'
-  const root = await getJson(`${base}/categories/?lang=es&wh=${wh}`).catch(() => getJson(`${base}/v1_1/categories/?lang=es&wh=${wh}`))
+  const root = await getJsonRetry(`${base}/categories/?lang=es&wh=${wh}`).catch(() => getJsonRetry(`${base}/v1_1/categories/?lang=es&wh=${wh}`))
   const ids = mercadonaCategoryIds(root)
   if (!ids.length) throw new Error('Mercadona no ha devuelto categorías (¿ha cambiado su web?)')
   const all = new Map<string, ShopProduct>()
-  for (let i = 0; i < ids.length; i += 4) {
-    const parts = await Promise.all(ids.slice(i, i + 4).map((id) => getJson(`${base}/categories/${id}/?lang=es&wh=${wh}`).then(parseMercadonaCategory).catch(() => [] as ShopProduct[])))
+  const failed: number[] = []
+  const fetchCat = (id: number) =>
+    getJsonRetry(`${base}/categories/${id}/?lang=es&wh=${wh}`)
+      .then(parseMercadonaCategory)
+      .catch(() => {
+        failed.push(id)
+        return [] as ShopProduct[]
+      })
+  // De 2 en 2 y con calma: si se le pide demasiado rápido, su web deja de contestar y faltarían apartados enteros (el pan, los huevos…).
+  for (let i = 0; i < ids.length; i += 2) {
+    const parts = await Promise.all(ids.slice(i, i + 2).map(fetchCat))
     parts.flat().forEach((p) => all.set(p.id, p))
-    await sleep(200)
+    await sleep(400)
+  }
+  // Una segunda vuelta, más despacio, para los apartados que fallaron.
+  for (const id of failed.splice(0)) {
+    await sleep(2000)
+    ;(await fetchCat(id)).forEach((p) => all.set(p.id, p))
   }
   const list = [...all.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  const meta = await db.doc('catalog/mercadona').get()
+  const prevCount = Number(meta.get('count') ?? 0)
   // Si algo ha ido mal, mejor quedarse con el catálogo anterior que con uno a medias.
   if (list.length < 300) throw new Error(`Mercadona: solo ${list.length} productos (¿ha cambiado su web?)`)
+  if (failed.length && list.length < prevCount * 0.9) throw new Error(`Mercadona: fallaron ${failed.length} apartados; se queda el catálogo anterior (${prevCount} productos)`)
+  if (failed.length) logger.warn(`Mercadona: fallaron ${failed.length} apartados: ${failed.join(', ')}`)
   const SIZE = 1500
   const chunks = Math.ceil(list.length / SIZE)
-  const prev = (await db.doc('catalog/mercadona').get()).get('chunks') ?? 0
+  const prev = meta.get('chunks') ?? 0
   const batch = db.batch()
   for (let c = 0; c < chunks; c++) batch.set(db.doc(`catalog/mercadona-${c}`), { rows: packRows(list.slice(c * SIZE, (c + 1) * SIZE)) })
   for (let c = chunks; c < prev; c++) batch.delete(db.doc(`catalog/mercadona-${c}`))
-  batch.set(db.doc('catalog/mercadona'), { count: list.length, chunks, wh, updatedAt: FieldValue.serverTimestamp() })
+  batch.set(db.doc('catalog/mercadona'), { count: list.length, chunks, wh, failed: failed.length, sections: ids.length, updatedAt: FieldValue.serverTimestamp() })
   await batch.commit()
   logger.info(`Mercadona: ${list.length} productos (${wh})`)
   return list.length

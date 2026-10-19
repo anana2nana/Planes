@@ -7,6 +7,8 @@ export interface Catalog {
   items: Product[]
   updatedAt: Date | null
   wh: string
+  /** Apartados de Mercadona que no se pudieron descargar la última vez. */
+  failed: number
 }
 
 // El catálogo de Mercadona se lee una vez por sesión (unos pocos documentos; quedan en la caché del móvil).
@@ -16,13 +18,14 @@ export function loadMercadona(force = false): Promise<Catalog> {
   if (!mercadona || force)
     mercadona = (async () => {
       const meta = await getDoc(doc(db, 'catalog', 'mercadona'))
-      if (!meta.exists()) return { items: [], updatedAt: null, wh: '' }
+      if (!meta.exists()) return { items: [], updatedAt: null, wh: '', failed: 0 }
       const n = Number(meta.get('chunks') ?? 0)
       const parts = await Promise.all(Array.from({ length: n }, (_, i) => getDoc(doc(db, 'catalog', `mercadona-${i}`))))
       return {
         items: parts.flatMap((p) => (p.exists() ? unpackRows(String(p.get('rows') ?? '[]'), 'mercadona') : [])),
         updatedAt: meta.get('updatedAt')?.toDate?.() ?? null,
         wh: String(meta.get('wh') ?? ''),
+        failed: Number(meta.get('failed') ?? 0),
       }
     })().catch((e) => {
       mercadona = null

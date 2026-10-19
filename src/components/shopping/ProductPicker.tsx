@@ -148,9 +148,15 @@ export function ProductPicker({ initial, onPick, only }: { initial: string; onPi
           <p className="p-2 text-center text-sm text-muted">No hay nada con «{q.trim()}». Prueba con otra palabra.</p>
         )
       )}
-      {store === 'mercadona' && catalog?.updatedAt && (
+      {store === 'mercadona' && catalog?.updatedAt && state !== 'downloading' && (
         <p className="text-center text-[11px] text-muted">
-          Precios de Mercadona{catalog.wh === 'mad1' ? ' Madrid' : ''} del {dayFmt.format(catalog.updatedAt)} · pueden variar en tienda
+          Precios de Mercadona{catalog.wh === 'mad1' ? ' Madrid' : ''} del {dayFmt.format(catalog.updatedAt)} ·{' '}
+          {catalog.items.length.toLocaleString('es-ES', { useGrouping: 'always' } as Intl.NumberFormatOptions)} productos · pueden variar en tienda
+          {catalog.failed > 0 && ` · faltaron ${catalog.failed} apartados`}
+          <br />
+          <button onClick={download} className="mt-1 font-bold text-emerald-700 underline">
+            ¿Falta algo? Volver a descargar el catálogo
+          </button>
         </p>
       )}
       {store === 'ahorramas' && <p className="text-center text-[11px] text-muted">Precios de la web de Ahorramás · pueden variar en tienda</p>}
