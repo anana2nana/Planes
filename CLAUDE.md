@@ -120,6 +120,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 - El emulador de Firestore se cae al recargar `firestore.rules` en caliente (el proxy bloquea una llamada): tras cambiar reglas, reinícialo.
 - En Playwright, un checkbox controlado por Firestore puede no cambiar al instante: usa `click()`, no `check()`.
 - `tsconfig.app.json` tiene `allowImportingTsExtensions`: en `src/lib/` los imports en tiempo de ejecución entre módulos llevan `.ts` (p. ej. `./recipe.ts`) para que los tests de Node (`--experimental-strip-types`) los encuentren.
+- Si al subir GitHub da "Internal Server Error" y acaba entrando en un reintento, Vercel puede no enterarse y no publicar: comprobar que la app cambió y, si no, subir otro commit (o "Redeploy" en Vercel).
 - Las notificaciones push no se actualizan solas: nada de cuentas atrás en el texto ("Quedan 27 min" se queda viejo); poner la hora ("Hoy a las 19:00 (en 27 min)").
 
 ## Ideas pendientes
