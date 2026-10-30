@@ -77,6 +77,22 @@ service cloud.firestore {
     }
 
     // Lista de la compra.
+    // Reto de tareas: las tareas con sus puntos (las cambian los dos) y lo que apunta cada uno (solo lo suyo).
+    match /chores/{choreId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.points is int && request.resource.data.points >= 1 && request.resource.data.points <= 5;
+    }
+    match /choreLogs/{logId} {
+      allow read: if isCouple();
+      allow create: if isCouple()
+        && request.resource.data.by == me()
+        && request.resource.data.choreId is string
+        && request.resource.data.date is string;
+      allow delete: if isCouple() && resource.data.by == me();
+    }
     // Catálogo de Mercadona para los precios de la compra (lo escribe solo el servidor).
     match /catalog/{docId} {
       allow read: if isCouple();

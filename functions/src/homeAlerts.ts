@@ -3,6 +3,7 @@
 
 import { eur, installmentDate, paidInstallments, unitAmount, type Fund, type HomeConfig, type HomeItem } from './home.js'
 import { daysUntil, nextDue, type CareItem } from './pet.js'
+import { leaderText, monthName, monthRange, score, weekRange, type Chore, type ChoreLog } from './chores.js'
 import { GIFT_LEADS, upcomingOccasions, type GiftOccasion, type GiftStatus } from './gifts.js'
 import { NAME, type NotifPrefs, type Person, type Push } from './logic.js'
 
@@ -266,4 +267,33 @@ export function capsulePushes(caps: CapsuleLite[], now: Date): Push[] {
       pushes.push({ to, kind: 'reminder', title: `💌 Mañana podrás abrir una carta de ${NAME[c.from]}`, body: 'Está guardada en Nosotros → Cápsula del tiempo.', tag: `capsule-${c.openAt}` })
   }
   return pushes
+}
+
+// ─── Reto de tareas ─────────────────────────────────────────────────────────
+
+/**
+ * Los domingos, cómo ha ido la semana y cómo va el mes; el último día del mes, quién gana.
+ * A los dos (con la preferencia de avisos de casa). Nada si no hay tareas en el reto.
+ */
+export function chorePushes(chores: Pick<Chore, 'id' | 'points'>[], logs: Pick<ChoreLog, 'choreId' | 'by' | 'date' | 'points'>[], prefs: Record<Person, NotifPrefs>, now: Date): Push[] {
+  if (!chores.length) return []
+  const names = { nita: 'Nita', kitos: 'Kitos' }
+  const lastDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getDate() === 1
+  const month = monthRange(now)
+  const m = score(chores, logs, month.from, month.to)
+  const mes = monthName(now)
+  let title = ''
+  let body = ''
+  if (lastDay) {
+    if (m.nita + m.kitos === 0) return []
+    title = `🏆 Reto de ${mes}: ${leaderText(m, names, true)}`
+    body = `Nita ${m.nita} · Kitos ${m.kitos} puntos. Entre los dos, ${m.nita + m.kitos} 💪\nMañana empieza otro mes.`
+  } else if (now.getDay() === 0) {
+    const w = weekRange(now)
+    const s = score(chores, logs, w.from, w.to)
+    if (s.nita + s.kitos === 0 && m.nita + m.kitos === 0) return []
+    title = `🏆 Reto de ${mes}: así va la semana`
+    body = `Esta semana: Nita ${s.nita} · Kitos ${s.kitos}\nEn ${mes}: Nita ${m.nita} · Kitos ${m.kitos} (${leaderText(m, names)})`
+  } else return []
+  return (['nita', 'kitos'] as Person[]).filter((p) => prefs[p].home).map((p) => ({ to: p, kind: 'reminder' as const, title, body, tag: 'chores' }))
 }

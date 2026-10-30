@@ -11,7 +11,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
 import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
-import { giftPushes, homePushes, petPushes, type GiftLite, capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes, type UpkeepLite } from './homeAlerts.js'
+import { chorePushes, giftPushes, homePushes, petPushes, type GiftLite, capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes, type UpkeepLite } from './homeAlerts.js'
 import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
 import type { CareItem } from './pet.js'
 import { mercadonaCategoryIds, packRows, parseAhorramas, parseMercadonaCategory, type ShopProduct } from './shops.js'
@@ -349,6 +349,20 @@ export const homeReminders = onSchedule({ schedule: '0 20 * * *', timeZone: 'Eur
     ),
   ]
   for (const push of extra) await send(push)
+
+  // Reto de tareas: resumen de los domingos y resultado el último día del mes.
+  {
+    const t = new Date()
+    const [choresSnap, logsSnap] = await Promise.all([db.collection('chores').get(), db.collection('choreLogs').where('date', '>=', ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 7))).get()])
+    const chores = choresSnap.docs.map((d) => ({ id: d.id, points: Number(d.get('points')) || 1 }))
+    const logs = logsSnap.docs.map((d) => ({ choreId: String(d.get('choreId') ?? ''), by: d.get('by') === 'kitos' ? ('kitos' as const) : ('nita' as const), date: String(d.get('date') ?? ''), points: Number(d.get('points')) || 1 }))
+    // El mes entero (para el total del mes) si empezó antes que hace una semana.
+    const monthStart = ymdOf(new Date(t.getFullYear(), t.getMonth(), 1))
+    const older = monthStart < ymdOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 7)) ? (await db.collection('choreLogs').where('date', '>=', monthStart).get()).docs : []
+    const seen = new Set(logsSnap.docs.map((d) => d.id))
+    for (const d of older) if (!seen.has(d.id)) logs.push({ choreId: String(d.get('choreId') ?? ''), by: d.get('by') === 'kitos' ? 'kitos' : 'nita', date: String(d.get('date') ?? ''), points: Number(d.get('points')) || 1 })
+    for (const push of chorePushes(chores, logs, prefs, t)) await send(push)
+  }
 
   // Domingo: ¿está hecho el menú de la semana que viene?
   if (new Date().getDay() === 0) {

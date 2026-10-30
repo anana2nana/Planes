@@ -558,3 +558,29 @@ test('Ahorramás: JSON-LD o fichas del listado', () => {
   assert.deepEqual(r[0], { store: 'ahorramas', id: '70865', name: 'Leche semidesnatada Alipende 1L', pack: '', price: 0.83, ref: '0,83 €/L', image: 'https://www.ahorramas.com/dw/image/v2/BFNH_PRD/on/demandware.static/-/Sites-ahorramas-master/default/dw1cfa46e2/Assets/070865_C1C1/large' })
   assert.deepEqual([r[1].name, r[1].price, r[1].ref], ['Leche entera Alipende 1L', 1.05, '1,05 €/L'])
 })
+
+import { chorePushes } from './homeAlerts.js'
+
+test('src/chores.ts es idéntico al de la app', () => {
+  const here = fileURLToPath(new URL('../src/chores.ts', import.meta.url))
+  const app = fileURLToPath(new URL('../../src/lib/chores.ts', import.meta.url))
+  assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
+})
+
+test('reto de tareas: resumen del domingo y ganador del mes', () => {
+  const prefs = { nita: { ...DEFAULT_PREFS, home: true }, kitos: { ...DEFAULT_PREFS, home: true } }
+  const chores = [{ id: 'f', points: 1 }, { id: 'b', points: 3 }]
+  const logs = [
+    { choreId: 'f', by: 'nita' as const, date: '2026-10-19', points: 1 },
+    { choreId: 'b', by: 'nita' as const, date: '2026-10-27', points: 3 },
+    { choreId: 'f', by: 'kitos' as const, date: '2026-10-28', points: 1 },
+  ]
+  const sunday = chorePushes(chores, logs, prefs, new Date('2026-10-25T20:00:00'))
+  assert.equal(sunday.length, 2)
+  assert.equal(sunday[0].title, '🏆 Reto de octubre: así va la semana')
+  assert.equal(sunday[0].body, 'Esta semana: Nita 1 · Kitos 0\nEn octubre: Nita 4 · Kitos 1 (Nita va delante por 3 puntos)')
+  const last = chorePushes(chores, logs, prefs, new Date('2026-10-31T20:00:00'))
+  assert.equal(last[0].title, '🏆 Reto de octubre: ¡Gana Nita por 3 puntos! 🏆')
+  assert.equal(chorePushes(chores, logs, prefs, new Date('2026-10-28T20:00:00')).length, 0)
+  assert.equal(chorePushes([], logs, prefs, new Date('2026-10-25T20:00:00')).length, 0)
+})

@@ -8,6 +8,7 @@ import { eur, nextPayment } from '../../lib/home'
 import { daysUntil, nextDue } from '../../lib/pet'
 import type { PersonId } from '../../lib/types'
 import { HomeView } from '../home/HomeView'
+import { ChoresSummary, ChoresView } from '../chores/ChoresView'
 import { NotesView } from '../home/NotesView'
 import { PetView } from '../home/PetView'
 import { ShoppingView } from '../ShoppingView'
@@ -18,8 +19,8 @@ import { SubsView, useSubs } from '../subs/SubsView'
 import { AreaTitle, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles' | 'mantenimiento' | 'coche' | 'suscripciones'
-const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles', mantenimiento: 'Mantenimiento', coche: 'El coche', suscripciones: 'Suscripciones' }
+type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles' | 'mantenimiento' | 'coche' | 'suscripciones' | 'reto'
+const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles', mantenimiento: 'Mantenimiento', coche: 'El coche', suscripciones: 'Suscripciones', reto: 'Reto de tareas' }
 
 /** Hogar: la casa (MEROE), la compra, la gata y las notas. Cada cosa es un espacio. */
 export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void }) {
@@ -39,6 +40,7 @@ export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m:
   if (section === 'mantenimiento') return <UpkeepView me={me} area="casa" onError={onError} />
   if (section === 'coche') return <CarView me={me} onError={onError} />
   if (section === 'suscripciones') return <SubsView me={me} onError={onError} />
+  if (section === 'reto') return <ChoresView me={me} onError={onError} />
   return <HogarHub onOpen={open} />
 }
 
@@ -69,6 +71,7 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
 
   return (
     <div className="space-y-5">
+      <ChoresSummary onOpen={() => onOpen('reto')} />
       <section>
         <AreaTitle>La casa</AreaTitle>
         <div className="grid grid-cols-2 gap-3">

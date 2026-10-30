@@ -4,6 +4,7 @@ import { CalendarView } from '../CalendarView'
 import { PlansView } from '../PlansView'
 import { useTimeline } from '../../hooks/useTimeline'
 import { markCareDone, usePet } from '../../hooks/usePet'
+import { ChoresSummary } from '../chores/ChoresView'
 import { DueChores } from '../upkeep/UpkeepView'
 import type { TimelineItem } from '../../lib/timeline'
 
@@ -81,6 +82,7 @@ export function AgendaView({
         <CalendarView plans={plans} me={me} tags={tags} priorities={priorities} onOpen={onOpen} onToggle={onToggle} onCreate={onCreate} extra={extra} onGo={onGo} />
       ) : (
         <>
+          {mode === 'tareas' && <ChoresSummary onOpen={() => onGo('hogar', 'reto')} />}
           {mode === 'tareas' && <DueChores me={me} onError={onToast} petName={profile?.name ?? ''} petCare={care} onPetDone={(c, d) => markCareDone(c, d, me).catch((e: Error) => onToast(e.message))} />}
           <PlansView kind={mode === 'planes' ? 'plan' : 'task'} plans={plans} me={me} tags={tags} priorities={priorities} loading={loading} onOpen={onOpen} onToggle={onToggle} />
         </>
