@@ -77,6 +77,14 @@ service cloud.firestore {
     }
 
     // Lista de la compra.
+    // Muebles y deco: lo que necesitáis por habitación, con opciones de tiendas (y sus votos) dentro.
+    match /furniture/{itemId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+        && (!('options' in request.resource.data) || (request.resource.data.options is list && request.resource.data.options.size() <= 12));
+    }
     // Reto de tareas: las tareas con sus puntos (las cambian los dos) y lo que apunta cada uno (solo lo suyo).
     match /chores/{choreId} {
       allow read, delete: if isCouple();

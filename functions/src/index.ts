@@ -14,8 +14,10 @@ import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
 import { chorePushes, giftPushes, homePushes, petPushes, type GiftLite, capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes, type UpkeepLite } from './homeAlerts.js'
 import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
 import type { CareItem } from './pet.js'
+import { parseProductPage, priceDropped } from './products.js'
 import { mercadonaCategoryIds, packRows, parseAhorramas, parseMercadonaCategory, type ShopProduct } from './shops.js'
 import type { Amount, CategoryId, Fund, HomeConfig, HomeItem, MonthlySchedule } from './home.js'
+import { eur as euros } from './home.js'
 import {
   LATE_GRACE_MIN,
   activityPushes,
@@ -545,4 +547,63 @@ export const shopSearch = onCall({ timeoutSeconds: 30 }, async (req) => {
   if (!items.length) logger.warn(`Ahorramás sin resultados para «${q}» ${lastError}`)
   else await cacheRef.set({ items: JSON.stringify(items), at: FieldValue.serverTimestamp() })
   return { items }
+})
+
+// ─── Muebles y deco: leer un producto de cualquier tienda y vigilar su precio ───
+
+async function fetchProduct(url: string) {
+  if (!/^https?:\/\//i.test(url)) throw new Error('Enlace no válido')
+  const res = await fetch(url, { headers: { ...BROWSER, Accept: 'text/html' }, redirect: 'follow' })
+  if (!res.ok) throw new Error(`La tienda ha contestado ${res.status}`)
+  const html = (await res.text()).slice(0, 3_000_000)
+  return parseProductPage(html, res.url || url)
+}
+
+/** "Pegar enlace" / "Compartir → Nitakitos": nombre, foto y precio del producto. */
+export const productInfo = onCall({ timeoutSeconds: 30 }, async (req) => {
+  if (!personOf(req.auth)) throw new HttpsError('permission-denied', 'Este espacio es privado.')
+  const url = String((req.data as { url?: unknown })?.url ?? '').trim().slice(0, 2000)
+  try {
+    return await fetchProduct(url)
+  } catch (e) {
+    logger.warn(`productInfo ${url}: ${(e as Error).message}`)
+    throw new HttpsError('unavailable', (e as Error).message)
+  }
+})
+
+/** Cada mañana: ¿ha bajado el precio de algo que tenéis guardado y aún no habéis comprado? */
+export const watchPrices = onSchedule({ schedule: '20 9 * * *', timeZone: 'Europe/Madrid', timeoutSeconds: 540 }, async () => {
+  const [snap, prefs] = await Promise.all([db.collection('furniture').where('status', '!=', 'bought').get(), loadPrefs()])
+  const today = ymdOf(new Date())
+  const drops: string[] = []
+  for (const d of snap.docs) {
+    const options = (d.get('options') ?? []) as Record<string, any>[]
+    let changed = false
+    for (const o of options) {
+      if (typeof o.url !== 'string' || !o.url || o.priceAt === today) continue
+      try {
+        const info = await fetchProduct(o.url)
+        const before = typeof o.price === 'number' ? o.price : null
+        if (info.price !== null && info.price !== before) {
+          if (priceDropped(before, info.price)) {
+            drops.push(`${String(d.get('name') ?? '')} (${o.store || 'tienda'}): de ${euros(before!, before! % 1 !== 0)} a ${euros(info.price, info.price % 1 !== 0)}`)
+            o.prevPrice = before
+          }
+          o.price = info.price
+          changed = true
+        }
+        o.priceAt = today
+        changed = true
+      } catch {
+        /* esa tienda hoy no contesta: se mira mañana */
+      }
+      await sleep(800)
+    }
+    if (changed) await d.ref.update({ options })
+  }
+  if (!drops.length) return
+  for (const p of ['nita', 'kitos'] as const) {
+    if (!prefs[p].home) continue
+    await send({ to: p, kind: 'reminder', title: drops.length === 1 ? '📉 Ha bajado de precio' : `📉 Han bajado ${drops.length} cosas`, body: `${drops.slice(0, 4).join('\n')}\nEstá en Hogar → Muebles y deco.`, tag: 'price-drop' })
+  }
 })

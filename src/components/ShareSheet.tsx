@@ -16,6 +16,7 @@ import { SpotSheet, emptySpot } from './spots/SpotsView'
 import { guessSpotKind } from '../lib/spots'
 import { mediaFromShare } from '../lib/media'
 import { RouteSheet } from './routes/RoutesView'
+import { AddLinkSheet, useFurniture } from './furniture/FurnishView'
 import { emptyRoute } from './routes/useRoutes'
 
 const TARGETS: { id: ShareTarget; label: string }[] = [
@@ -25,6 +26,7 @@ const TARGETS: { id: ShareTarget; label: string }[] = [
   { id: 'recipe', label: '🍝 Receta' },
   { id: 'media', label: '🎬 Hemeroteca' },
   { id: 'route', label: '🥾 Ruta' },
+  { id: 'mueble', label: '🛋️ Muebles' },
   { id: 'gift', label: '🎁 Regalo' },
   { id: 'shopping', label: '🛒 Compra' },
   { id: 'note', label: '📝 Nota' },
@@ -55,6 +57,8 @@ export function ShareSheet({
   const [media, setMedia] = useState(false)
   const [spot, setSpot] = useState(false)
   const [route, setRoute] = useState(false)
+  const [mueble, setMueble] = useState(false)
+  const { items: furniture } = useFurniture()
   const { items } = useShopping()
   const fail = (e: Error) => onToast(e.message)
 
@@ -88,6 +92,9 @@ export function ShareSheet({
         onError={onToast}
       />
     )
+
+  if (mueble)
+    return <AddLinkSheet me={me} items={furniture} itemId={null} initialUrl={shared.link} onClose={onClose} onError={onToast} onSaved={() => onToast('🛋️ Guardado en Hogar → Muebles y deco')} />
 
   if (route)
     return (
@@ -123,6 +130,7 @@ export function ShareSheet({
     if (target === 'media') return setMedia(true)
     if (target === 'spot') return setSpot(true)
     if (target === 'route') return setRoute(true)
+    if (target === 'mueble') return setMueble(true)
     if (target === 'plan') {
       onMakePlan({ title: t, place, notes: linkNote })
       return
@@ -150,7 +158,7 @@ export function ShareSheet({
       title="Guardar en Nitakitos"
       footer={
         <button onClick={save} disabled={!canSave} className="h-13 w-full rounded-2xl bg-ink font-bold text-cream disabled:opacity-30">
-          {target === 'gift' || target === 'plan' || target === 'recipe' || target === 'media' || target === 'spot' || target === 'route' ? 'Seguir' : 'Guardar'}
+          {target === 'gift' || target === 'plan' || target === 'recipe' || target === 'media' || target === 'spot' || target === 'route' || target === 'mueble' ? 'Seguir' : 'Guardar'}
         </button>
       }
     >

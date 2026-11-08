@@ -2,8 +2,9 @@
 
 import { isMediaLink } from './media.ts'
 import { isRouteLink } from './geo.ts'
+import { isFurnitureLink } from './furniture.ts'
 
-export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe' | 'media' | 'spot' | 'route'
+export type ShareTarget = 'idea' | 'gift' | 'shopping' | 'note' | 'plan' | 'recipe' | 'media' | 'spot' | 'route' | 'mueble'
 
 export interface Shared {
   /** Nombre o título principal (sin enlaces). */
@@ -44,7 +45,8 @@ export function parseShared(p: { title?: string | null; text?: string | null; ur
 
   // Desde Google Maps, lo normal es guardarlo en Sitios.
   let suggested: ShareTarget = isMaps ? 'spot' : 'idea'
-  if (link && SHOP_RE.test(link)) suggested = 'gift'
+  if (link && isFurnitureLink(link)) suggested = 'mueble'
+  else if (link && SHOP_RE.test(link)) suggested = 'gift'
   else if (link && isMediaLink(link)) suggested = 'media'
   else if (link && isRouteLink(link)) suggested = 'route'
   else if ((link && VIDEO_RE.test(link)) || /\breceta/i.test(all)) suggested = 'recipe'

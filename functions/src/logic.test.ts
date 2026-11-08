@@ -584,3 +584,33 @@ test('reto de tareas: resumen del domingo y ganador del mes', () => {
   assert.equal(chorePushes(chores, logs, prefs, new Date('2026-10-28T20:00:00')).length, 0)
   assert.equal(chorePushes([], logs, prefs, new Date('2026-10-25T20:00:00')).length, 0)
 })
+
+// ─── Muebles: leer productos de cualquier tienda ───────────────────────────
+import { parsePrice as productPrice, parseProductPage, priceDropped, storeName } from './products.js'
+
+test('muebles: precios escritos de mil maneras', () => {
+  assert.equal(productPrice('1.299,00 €'), 1299)
+  assert.equal(productPrice('1299.00'), 1299)
+  assert.equal(productPrice('1,299.00'), 1299)
+  assert.equal(productPrice('899'), 899)
+  assert.equal(productPrice('1.299'), 1299)
+  assert.equal(productPrice('8.99'), 8.99)
+  assert.equal(productPrice('49,95'), 49.95)
+  assert.equal(productPrice(749), 749)
+  assert.equal(productPrice('gratis'), null)
+  assert.equal(storeName('https://www.kavehome.com/es/es/p/sofa-dyna'), 'Kave Home')
+  assert.equal(storeName('https://www.ikea.com/es/es/p/kivik-sofa-123/'), 'IKEA')
+  assert.equal(storeName('https://www.tienda-rara.es/x'), 'tienda-rara.es')
+  assert.equal(priceDropped(899, 749), true)
+  assert.equal(priceDropped(899, 898.5), false)
+  assert.equal(priceDropped(null, 10), false)
+})
+
+test('muebles: nombre, foto y precio de una página de producto', () => {
+  const ld = `<html><head><meta property="og:title" content="Otro título"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage"},{"@type":"Product","name":"Sofá Dyna 3 plazas","image":["https://media.kavehome.com/dyna.jpg"],"offers":{"@type":"Offer","price":"899.00","priceCurrency":"EUR"}}]}</script></head></html>`
+  assert.deepEqual(parseProductPage(ld, 'https://kavehome.com/es/es/p/dyna'), { title: 'Sofá Dyna 3 plazas', image: 'https://media.kavehome.com/dyna.jpg', price: 899, store: 'Kave Home' })
+  const og = `<html><head><title>x</title><meta property="og:title" content="Mesa de comedor Ronda &amp; sillas | Sklum"><meta property="og:image" content="//cdn.sklum.com/mesa.jpg"><meta property="product:price:amount" content="249,95"></head></html>`
+  assert.deepEqual(parseProductPage(og, 'https://www.sklum.com/es/mesa'), { title: 'Mesa de comedor Ronda & sillas', image: 'https://cdn.sklum.com/mesa.jpg', price: 249.95, store: 'Sklum' })
+  const bare = `<html><head><title>KIVIK Sofá 3 plazas - IKEA</title></head><body><span itemprop="price" content="599"></span></body></html>`
+  assert.deepEqual(parseProductPage(bare, 'https://www.ikea.com/es/es/p/kivik/'), { title: 'KIVIK Sofá 3 plazas', image: '', price: 599, store: 'IKEA' })
+})

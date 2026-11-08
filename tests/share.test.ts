@@ -32,5 +32,6 @@ test('compartir un vídeo de TikTok o algo con "receta" → receta', () => {
   assert.equal(parseShared({ text: 'https://vm.tiktok.com/ZGabc123/' }).suggested, 'recipe')
   assert.equal(parseShared({ title: 'Receta de croquetas', text: 'https://www.instagram.com/reel/xyz/' }).suggested, 'recipe')
   assert.equal(parseShared({ text: 'https://www.instagram.com/reel/xyz/' }).suggested, 'idea')
+  assert.equal(parseShared({ title: 'Sofá Dyna | Kave Home', url: 'https://kavehome.com/es/es/p/sofa-dyna' }).suggested, 'mueble')
   assert.equal(parseShared({ title: 'La Pedriza circular', text: 'Mira esta ruta https://es.wikiloc.com/rutas-senderismo/la-pedriza-123' }).suggested, 'route')
 })

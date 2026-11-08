@@ -13,6 +13,7 @@ import { ItemForm } from './ItemForm'
 import { MortgageView } from './MortgageView'
 import { PaymentsView } from './PaymentsView'
 import { FurnitureView } from './FurnitureView'
+import { FurnishView } from '../furniture/FurnishView'
 import { SavingsView } from './SavingsView'
 import { Label, NumberField, Segmented } from './ui'
 
@@ -115,9 +116,7 @@ export function HomeView({ me, onError, onTitle }: { me: PersonId; onError: (m: 
             onOpenMortgage={() => open('hipoteca')}
           />
         )}
-        {section === 'muebles' && (
-          <FurnitureView config={config} items={items} money={money} onEditItem={(item, category) => openSheet({ type: 'item', item, category })} onEditBudgets={() => openSheet({ type: 'budgets' })} />
-        )}
+        {section === 'muebles' && <FurnitureTabs me={me} onError={onError} gastos={<FurnitureView config={config} items={items} money={money} onEditItem={(item, category) => openSheet({ type: 'item', item, category })} onEditBudgets={() => openSheet({ type: 'budgets' })} />} />}
         {section === 'hipoteca' && <MortgageView config={config} items={items} euribor={euribor} money={eur} onError={onError} />}
         {section === 'llegamos' && <SavingsView config={config} items={items} funds={funds} me={me} money={money} onError={onError} />}
         {sheets}
@@ -304,5 +303,27 @@ function BudgetsSheet({ config, onClose, onError }: { config: NonNullable<Return
         ))}
       </div>
     </BottomSheet>
+  )
+}
+
+/** Muebles en MEROE: lo que buscáis por habitaciones (opciones, votos, precios) y los gastos ya hechos. */
+function FurnitureTabs({ me, onError, gastos }: { me: PersonId; onError: (m: string) => void; gastos: React.ReactNode }) {
+  const [tab, setTab] = useState<'habitaciones' | 'gastos'>('habitaciones')
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-stone-100 p-1" role="tablist" aria-label="Muebles">
+        {(
+          [
+            ['habitaciones', '🛋️ Por habitaciones'],
+            ['gastos', '💶 Gastos y presupuesto'],
+          ] as const
+        ).map(([t, label]) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`h-9 rounded-xl text-sm font-bold ${tab === t ? 'bg-surface shadow-sm' : 'text-muted'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'habitaciones' ? <FurnishView me={me} onError={onError} /> : gastos}
+    </div>
   )
 }

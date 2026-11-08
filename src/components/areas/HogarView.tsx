@@ -9,6 +9,7 @@ import { daysUntil, nextDue } from '../../lib/pet'
 import type { PersonId } from '../../lib/types'
 import { HomeView } from '../home/HomeView'
 import { ChoresSummary, ChoresView } from '../chores/ChoresView'
+import { FurnishView, useFurnitureSummary } from '../furniture/FurnishView'
 import { NotesView } from '../home/NotesView'
 import { PetView } from '../home/PetView'
 import { ShoppingView } from '../ShoppingView'
@@ -19,8 +20,8 @@ import { SubsView, useSubs } from '../subs/SubsView'
 import { AreaTitle, Tile } from '../hub/Tile'
 import type { AreaTitleInfo } from './types'
 
-type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles' | 'mantenimiento' | 'coche' | 'suscripciones' | 'reto'
-const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles', mantenimiento: 'Mantenimiento', coche: 'El coche', suscripciones: 'Suscripciones', reto: 'Reto de tareas' }
+type Section = 'meroe' | 'compra' | 'gata' | 'notas' | 'papeles' | 'mantenimiento' | 'coche' | 'suscripciones' | 'reto' | 'muebles'
+const TITLE: Record<Section, string> = { meroe: 'MEROE', compra: 'Lista de la compra', gata: 'La gata', notas: 'Notas de casa', papeles: 'Papeles', mantenimiento: 'Mantenimiento', coche: 'El coche', suscripciones: 'Suscripciones', reto: 'Reto de tareas', muebles: 'Muebles y deco' }
 
 /** Hogar: la casa (MEROE), la compra, la gata y las notas. Cada cosa es un espacio. */
 export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m: string) => void; onTitle: (t: AreaTitleInfo | null) => void }) {
@@ -41,6 +42,7 @@ export function HogarView({ me, onError, onTitle }: { me: PersonId; onError: (m:
   if (section === 'coche') return <CarView me={me} onError={onError} />
   if (section === 'suscripciones') return <SubsView me={me} onError={onError} />
   if (section === 'reto') return <ChoresView me={me} onError={onError} />
+  if (section === 'muebles') return <FurnishView me={me} onError={onError} />
   return <HogarHub onOpen={open} />
 }
 
@@ -49,6 +51,7 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
   const { items: shopping } = useShopping()
   const { profile, care } = usePet()
   const { notes } = useNotes()
+  const furn = useFurnitureSummary()
   const today = new Date()
   const next = config ? nextPayment(items, config, today) : null
   const pending = shopping.filter((i) => !i.done)
@@ -86,6 +89,10 @@ function HogarHub({ onOpen }: { onOpen: (s: Section) => void }) {
             ) : (
               'Plan de pagos · Hipoteca · ¿Llegamos? · Muebles'
             )}
+          </Tile>
+          <Tile emoji="🛋️" title="Muebles y deco" onClick={() => onOpen('muebles')} muted={furn.total === 0}>
+            {furn.total === 0 ? 'Por habitaciones, opciones de cualquier tienda y avisos si bajan de precio' : `${furn.open} por comprar${furn.chosen ? ` · ${furn.chosen} elegidas` : ''}`}
+            {furn.drops > 0 && <span className="block font-bold text-emerald-700">📉 {furn.drops} {furn.drops === 1 ? 'ha bajado' : 'han bajado'} de precio</span>}
           </Tile>
           <Tile emoji="🛒" title="Compra" onClick={() => onOpen('compra')} muted={pending.length === 0}>
             {pending.length === 0 ? (
