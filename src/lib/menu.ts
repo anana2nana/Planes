@@ -3,6 +3,7 @@
 import { richFromSimple, shoppingNames, type RichRecipe } from './recipe.ts'
 import type { DishColor, NutritionOverride } from './nutrition.ts'
 import type { PersonId } from './types'
+import type { RecipeCat } from './recipeOrg.ts'
 
 export type MealSlot = 'comida' | 'cena'
 /** Dónde come cada uno: en casa, se lleva táper o come fuera. */
@@ -39,7 +40,22 @@ export interface Recipe extends Omit<RichRecipe, 'title' | 'url' | 'servings' | 
   /** Última vez que se puso en el menú (yyyy-mm-dd). */
   lastPlanned: string | null
   createdAt: number
+  // ─── Para organizar el recetario (null = la app lo adivina) ───
+  category: RecipeCat | null
+  minutes: number | null
+  taper: boolean | null
+  favorite: boolean
+  rating: { nita: number | null; kitos: number | null }
+  /** ¿La volveríais a hacer? */
+  again: boolean | null
+  /** Listas vuestras ("Para invitados", "Navidad"…). */
+  lists: string[]
+  /** Miniatura cuadrada de la foto del plato (la grande va aparte, en recipePhotos/{id}). */
+  thumb: string | null
 }
+
+/** Campos de organizar: opcionales al crear o editar una receta (al guardar con merge se conservan). */
+export type RecipeOrgKey = 'category' | 'minutes' | 'taper' | 'favorite' | 'rating' | 'again' | 'lists' | 'thumb'
 
 export const EAT: Record<EatMode, { label: string; emoji: string; next: EatMode }> = {
   casa: { label: 'En casa', emoji: '🏠', next: 'taper' },

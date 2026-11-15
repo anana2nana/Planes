@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { collection, deleteDoc, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { EAT, defaultEat, mealId, type EatMode, type Meal, type MealSlot, type Recipe } from '../lib/menu'
+import { EAT, defaultEat, mealId, type EatMode, type Meal, type MealSlot, type Recipe, type RecipeOrgKey } from '../lib/menu'
+import { RECIPE_CATS, type RecipeCat } from '../lib/recipeOrg'
 import type { DishColor } from '../lib/nutrition'
 import { flatIngredients, flatSteps } from '../lib/recipe'
 import type { PersonId } from '../lib/types'
@@ -104,6 +105,14 @@ function parseRecipe(id: string, x: Record<string, any>): Recipe {
     nutrition: { color: isColor(x.nutrition?.color) ? x.nutrition.color : null, kcal: typeof x.nutrition?.kcal === 'number' ? x.nutrition.kcal : null },
     lastPlanned: typeof x.lastPlanned === 'string' ? x.lastPlanned : null,
     createdAt: x.createdAt?.toMillis?.() ?? 0,
+    category: typeof x.category === 'string' && x.category in RECIPE_CATS ? (x.category as RecipeCat) : null,
+    minutes: typeof x.minutes === 'number' && x.minutes > 0 ? x.minutes : null,
+    taper: typeof x.taper === 'boolean' ? x.taper : null,
+    favorite: x.favorite === true,
+    rating: { nita: typeof x.rating?.nita === 'number' ? x.rating.nita : null, kitos: typeof x.rating?.kitos === 'number' ? x.rating.kitos : null },
+    again: typeof x.again === 'boolean' ? x.again : null,
+    lists: arr(x.lists, str).filter(Boolean),
+    thumb: typeof x.thumb === 'string' && x.thumb.startsWith('data:image') ? x.thumb : null,
   }
 }
 
@@ -120,7 +129,7 @@ export function saveMeal(m: Omit<Meal, 'id'>, me: PersonId) {
 }
 export const deleteMeal = (id: string) => deleteDoc(doc(meals, id))
 
-export type RecipeDraft = Omit<Recipe, 'id' | 'lastPlanned' | 'createdAt' | 'hasHtml'> & { id?: string }
+export type RecipeDraft = Omit<Recipe, 'id' | 'lastPlanned' | 'createdAt' | 'hasHtml' | RecipeOrgKey> & Partial<Pick<Recipe, RecipeOrgKey>> & { id?: string }
 
 /** Máximo de caracteres del HTML original que se guarda (los documentos de Firestore admiten 1 MB). */
 export const MAX_HTML = 700_000
@@ -142,4 +151,32 @@ export function saveRecipe(r: RecipeDraft, me: PersonId, onError: (m: string) =>
 export function deleteRecipe(id: string) {
   deleteDoc(doc(htmls, id)).catch(() => {})
   return deleteDoc(doc(recipes, id))
+}
+
+/** Cambiar solo lo de organizar (favorita, categoría, nota…) sin tocar la receta. */
+export function updateRecipeOrg(id: string, patch: Partial<Pick<Recipe, RecipeOrgKey>>, onError: (m: string) => void = console.error) {
+  setDoc(doc(recipes, id), patch, { merge: true }).catch((e: Error) => onError(e.message))
+}
+
+/** Foto grande del plato (aparte, para que la lista pese poco). */
+export const loadRecipePhoto = async (id: string) => {
+  const s = await getDoc(doc(db, 'recipePhotos', id))
+  return s.exists() ? (s.get('data') as string) : null
+}
+export function saveRecipePhoto(id: string, data: string | null, thumb: string | null, onError: (m: string) => void = console.error) {
+  ;(data ? setDoc(doc(db, 'recipePhotos', id), { data }) : deleteDoc(doc(db, 'recipePhotos', id))).catch((e: Error) => onError(e.message))
+  setDoc(doc(recipes, id), { thumb }, { merge: true }).catch((e: Error) => onError(e.message))
+}
+
+/** Todas las comidas con receta (para "las que más hacéis"): pocas al año, se leen enteras. */
+export function useCookedMeals() {
+  const [list, setList] = useState<{ recipeId: string | null; date: string }[]>([])
+  useEffect(
+    () =>
+      onSnapshot(meals, (snap) =>
+        setList(snap.docs.map((d) => ({ recipeId: typeof d.get('recipeId') === 'string' ? d.get('recipeId') : null, date: String(d.get('date') ?? '') })).filter((m) => m.recipeId)),
+      ),
+    [],
+  )
+  return list
 }

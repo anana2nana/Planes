@@ -212,7 +212,7 @@ function YearCard({ items }: { items: Media[] }) {
 }
 
 /** Cinco estrellas que se pueden poner a medias (como puntuar sobre 10). Tocar la nota que ya hay la quita. */
-function Stars({ value, onChange, label }: { value: number | null; onChange: (v: number | null) => void; label: string }) {
+export function Stars({ value, onChange, label }: { value: number | null; onChange: (v: number | null) => void; label: string }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex" role="radiogroup" aria-label={label}>

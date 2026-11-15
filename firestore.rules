@@ -188,6 +188,13 @@ service cloud.firestore {
         && request.resource.data.ingredients is list && request.resource.data.ingredients.size() <= 100;
     }
 
+    // Foto grande de cómo os quedó cada receta (la miniatura va en la propia receta).
+    match /recipePhotos/{recipeId} {
+      allow read, delete: if isCouple();
+      allow create, update: if isCouple()
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
+    }
+
     // Diario: recuerdos (con miniatura) y sus fotos a tamaño completo, aparte.
     match /memories/{memoryId} {
       allow read, delete: if isCouple();

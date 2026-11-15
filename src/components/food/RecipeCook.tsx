@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadRecipeHtml } from '../../hooks/useMenu'
+import { loadRecipeHtml, updateRecipeOrg } from '../../hooks/useMenu'
 import { useLayer } from '../../hooks/useLayer'
+import { OrgSheet, RateSection, RecipeChips, RecipePhoto } from './RecipeOrg'
 import { beep, useWakeLock } from '../../hooks/useWakeLock'
 import { useShopping } from '../../hooks/useShopping'
 import { isPantry, richOf, sourceOf, type Recipe } from '../../lib/menu'
@@ -24,7 +25,7 @@ function readMarks(id: string): Record<string, boolean> {
 }
 
 /** Receta a pantalla completa para cocinar: tachar ingredientes, marcar pasos, temporizadores y raciones. */
-export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: Recipe; me: PersonId; onClose: () => void; onEdit: () => void; onToast: (m: string) => void }) {
+export function RecipeCook({ recipe, me, onClose, onEdit, onToast, allLists = [] }: { recipe: Recipe; me: PersonId; onClose: () => void; onEdit: () => void; onToast: (m: string) => void; allLists?: string[] }) {
   const close = useLayer('cook', onClose)
   useWakeLock()
   const r = richOf(recipe)
@@ -32,6 +33,7 @@ export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: R
   const factor = r.servings && servings ? servings / r.servings : 1
   const [marks, setMarks] = useState(() => readMarks(recipe.id))
   const [original, setOriginal] = useState<string | null>(null)
+  const [organizing, setOrganizing] = useState(false)
   const { items } = useShopping()
   const toggle = (k: string) =>
     setMarks((m) => {
@@ -79,6 +81,9 @@ export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: R
             Original
           </button>
         )}
+        <button onClick={() => updateRecipeOrg(recipe.id, { favorite: !recipe.favorite }, onToast)} aria-pressed={recipe.favorite} aria-label={recipe.favorite ? 'Quitar de favoritas' : 'Marcar como favorita'} className="grid size-9 place-items-center rounded-full bg-surface text-lg shadow-sm">
+          {recipe.favorite ? '⭐' : '☆'}
+        </button>
         <button onClick={onEdit} className="rounded-full bg-ink px-3.5 py-2 text-xs font-bold text-cream">
           Editar
         </button>
@@ -87,11 +92,20 @@ export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: R
       <main className="mx-auto max-w-2xl space-y-6 px-4 pb-24">
         {/* Portada */}
         <header className="pt-2">
-          <div className="text-6xl" aria-hidden>
-            {recipe.emoji}
-          </div>
+          <RecipePhoto recipe={recipe} />
+          {!recipe.thumb && (
+            <div className="text-6xl" aria-hidden>
+              {recipe.emoji}
+            </div>
+          )}
           <h1 className="mt-2 text-3xl font-extrabold leading-tight tracking-tight">{r.title}</h1>
           {r.description && <p className="mt-2 text-muted">{r.description}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <RecipeChips recipe={recipe} />
+            <button onClick={() => setOrganizing(true)} className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+              🗂️ Organizar
+            </button>
+          </div>
           {(() => {
             const n = dishNutrition({ color: null, title: recipe.title }, recipe)
             return n.color || n.kcal ? (
@@ -228,6 +242,8 @@ export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: R
           </section>
         )}
 
+        <RateSection recipe={recipe} me={me} onError={onToast} />
+
         {Object.values(marks).some(Boolean) && (
           <button onClick={reset} className="mx-auto block rounded-full border border-stone-200 px-4 py-2 text-xs font-bold text-muted">
             Borrar marcas
@@ -236,6 +252,7 @@ export function RecipeCook({ recipe, me, onClose, onEdit, onToast }: { recipe: R
       </main>
 
       {original !== null && <OriginalView html={original} onClose={() => setOriginal(null)} />}
+      {organizing && <OrgSheet recipe={recipe} allLists={allLists} onClose={() => setOrganizing(false)} onError={onToast} />}
     </div>
   )
 }
