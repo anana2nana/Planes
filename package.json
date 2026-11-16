@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "dev:bbs": "vite --config vite.bbs.config.ts",
+    "build:bbs": "tsc -b && vite build --config vite.bbs.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "TZ=Europe/Madrid node --experimental-strip-types --no-warnings --test tests/*.test.ts && npm --prefix functions test"

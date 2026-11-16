@@ -44,7 +44,11 @@ self.addEventListener('notificationclick', (event) => {
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       const existing = windows.find((w) => new URL(w.url).origin === self.location.origin)
-      if (existing) return existing.focus()
+      if (existing) {
+        // Avisos que llevan a un sitio concreto (p. ej. los de bbs dentro de Nitakitos: /?bbs=1).
+        if (url !== '/' && 'navigate' in existing) await existing.navigate(url).catch(() => {})
+        return existing.focus()
+      }
       return self.clients.openWindow(url)
     })(),
   )

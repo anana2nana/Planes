@@ -614,3 +614,21 @@ test('muebles: nombre, foto y precio de una página de producto', () => {
   const bare = `<html><head><title>KIVIK Sofá 3 plazas - IKEA</title></head><body><span itemprop="price" content="599"></span></body></html>`
   assert.deepEqual(parseProductPage(bare, 'https://www.ikea.com/es/es/p/kivik/'), { title: 'KIVIK Sofá 3 plazas', image: '', price: 599, store: 'IKEA' })
 })
+
+// ─── bbs (Nita, Kitos y María) ──────────────────────────────────────────────
+
+import { addedPushes as bbsAdded, endingPushes as bbsEnding, parseBbsItem } from './bbs.js'
+
+test('src/bbs.ts es idéntico al de la app', () => {
+  const here = fileURLToPath(new URL('../src/bbs.ts', import.meta.url))
+  const app = fileURLToPath(new URL('../../src/lib/bbs.ts', import.meta.url))
+  assert.equal(readFileSync(here, 'utf8'), readFileSync(app, 'utf8'))
+})
+
+test('bbs: lo que apunta María avisa a Nita y a Kitos; lo que se acaba, a los tres', () => {
+  const i = parseBbsItem('x', { title: 'Mercadillo', kind: 'expo', addedBy: 'maria', from: '2026-12-05', to: '2026-12-08' })
+  assert.deepEqual(bbsAdded(i).map((p) => p.to), ['nita', 'kitos'])
+  const [r] = bbsEnding([i], '2026-12-06')
+  assert.equal(r.step, '2')
+  assert.deepEqual(r.pushes.map((p) => p.to), ['nita', 'kitos', 'maria'])
+})

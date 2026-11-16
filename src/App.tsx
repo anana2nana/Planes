@@ -16,7 +16,8 @@ import { ymd } from './lib/memories'
 import { KINDS } from './lib/kinds'
 import type { Idea } from './lib/ideas'
 import { setIdeaDone } from './services/ideas'
-import { DeniedScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
+import { DeniedScreen, GoToBbsScreen, LoginScreen, SetupScreen, Splash } from './components/AuthScreens'
+import { BBS_URL, isMariaEmail } from './bbs/people'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Avatar } from './components/Avatar'
 import { CalendarIcon, ChevronIcon, CloudOffIcon, HeartIcon, HomeIcon, LeafIcon, PlusIcon, SlidersIcon, SunIcon } from './components/Icons'
@@ -35,7 +36,7 @@ export default function App() {
   if (!isFirebaseConfigured) return <SetupScreen />
   if (auth.status === 'loading') return <Splash />
   if (auth.status === 'signed-out') return <LoginScreen />
-  if (auth.status === 'denied') return <DeniedScreen user={auth.user} />
+  if (auth.status === 'denied') return isMariaEmail(auth.user.email) ? <GoToBbsScreen user={auth.user} bbsUrl={BBS_URL} /> : <DeniedScreen user={auth.user} />
   return <Home user={auth.user} me={auth.me} />
 }
 
@@ -168,6 +169,13 @@ function Home({ user, me }: { user: User; me: PersonId }) {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
+
+  // Un aviso de bbs abre la app en /?bbs=1: directos a su baldosa en Nosotros.
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has('bbs')) return
+    history.replaceState(null, '', '/')
+    go('nosotros', 'bbs')
+  }, [go])
 
   // Acceso directo "Nuevo plan" (mantener pulsado el icono de la app en Android).
   useEffect(() => {

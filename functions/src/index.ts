@@ -5,11 +5,12 @@ import { initializeApp } from 'firebase-admin/app'
 import { FieldValue, Timestamp, getFirestore, type DocumentSnapshot } from 'firebase-admin/firestore'
 import { getMessaging } from 'firebase-admin/messaging'
 import { logger, setGlobalOptions } from 'firebase-functions/v2'
-import { onDocumentWritten } from 'firebase-functions/v2/firestore'
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { defineString } from 'firebase-functions/params'
 import { parseRepeat } from './recurrence.js'
+import { BBS_PEOPLE, addedPushes as bbsAddedPushes, endingPushes as bbsEndingPushes, parseBbsItem, ymdOf as bbsYmd, type BbsPerson, type BbsPush } from './bbs.js'
 import { ECB_EURIBOR_URL, parseEcbCsv } from './euribor.js'
 import { chorePushes, giftPushes, homePushes, petPushes, type GiftLite, capsulePushes, healthPushes, paperPushes, subPushes, upkeepPushes, type UpkeepLite } from './homeAlerts.js'
 import { buildIcs, feedPlans, type IcsPlan } from './ics.js'
@@ -46,6 +47,8 @@ const db = getFirestore()
 
 const NITA_EMAIL = defineString('NITA_EMAIL', { description: 'Email de Google de Nita' })
 const KITOS_EMAIL = defineString('KITOS_EMAIL', { description: 'Email de Google de Kitos' })
+// Solo para bbs (la app de planes con María). Vacío = María aún no puede probar los avisos.
+const MARIA_EMAIL = defineString('MARIA_EMAIL', { default: '', description: 'Email de Google de María (solo bbs)' })
 
 const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true'
 
@@ -606,4 +609,81 @@ export const watchPrices = onSchedule({ schedule: '20 9 * * *', timeZone: 'Europ
     if (!prefs[p].home) continue
     await send({ to: p, kind: 'reminder', title: drops.length === 1 ? '📉 Ha bajado de precio' : `📉 Han bajado ${drops.length} cosas`, body: `${drops.slice(0, 4).join('\n')}\nEstá en Hogar → Muebles y deco.`, tag: 'price-drop' })
   }
+})
+
+// ─── bbs: planes y sitios de Nita, Kitos y María ───────────────────────────
+// Sus móviles se apuntan en `bbsDevices` (aparte de `devices`, que es solo de la pareja).
+// Cada documento dice desde qué app se activó (`app`: bbs o nitakitos) para abrir la buena al tocar el aviso.
+
+type BbsPrefs = { added: boolean; ending: boolean }
+
+async function loadBbsPrefs(): Promise<Record<BbsPerson, BbsPrefs>> {
+  const data = (await db.doc('bbsConfig/notifications').get()).data() ?? {}
+  const one = (v: any): BbsPrefs => ({ added: v?.added !== false, ending: v?.ending !== false })
+  return { nita: one(data.nita), kitos: one(data.kitos), maria: one(data.maria) }
+}
+
+async function sendBbs(push: BbsPush) {
+  const devices = await db.collection('bbsDevices').where('person', '==', push.to).get()
+  if (isEmulator) {
+    logger.info(`[bbs push → ${push.to}] ${push.title} — ${push.body}`, { devices: devices.size })
+    return
+  }
+  // Agrupar por app: en bbs el aviso abre bbs; en Nitakitos, la baldosa de bbs.
+  const byUrl = new Map<string, string[]>()
+  for (const d of devices.docs) {
+    const token = d.get('token') as string
+    if (!token) continue
+    const url = d.get('app') === 'nitakitos' ? '/?bbs=1' : '/'
+    byUrl.set(url, [...(byUrl.get(url) ?? []), token])
+  }
+  for (const [url, tokens] of byUrl) {
+    const res = await getMessaging().sendEachForMulticast({
+      tokens,
+      data: { title: push.title, body: push.body, tag: push.tag, kind: push.kind, url },
+      webpush: { headers: { Urgency: 'high', TTL: String(push.kind === 'reminder' ? 3600 * 6 : 86400) } },
+    })
+    const stale = res.responses
+      .map((r, i) => (!r.success && /registration-token-not-registered|invalid-argument|invalid-registration-token/.test(r.error?.code ?? '') ? tokens[i] : null))
+      .filter((t): t is string => !!t)
+    await Promise.all(stale.map((t) => db.doc(`bbsDevices/${t}`).delete()))
+    logger.info(`bbs push → ${push.to}: ${res.successCount} ok, ${res.failureCount} fallos`)
+  }
+}
+
+/** Alguien apunta algo nuevo: avisa a los otros dos (a quien lo apunta, nunca). */
+export const onBbsItemCreated = onDocumentCreated('bbsItems/{itemId}', async (event) => {
+  if (!event.data) return
+  const item = parseBbsItem(event.data.id, event.data.data())
+  const prefs = await loadBbsPrefs()
+  await Promise.all(bbsAddedPushes(item).filter((p) => prefs[p.to].added).map(sendBbs))
+})
+
+/** Cada mañana: planes con fecha que se acaban (una semana antes, dos días antes y el último día). */
+export const bbsEndingSoon = onSchedule({ schedule: 'every day 10:10', timeZone: 'Europe/Madrid' }, async () => {
+  const snap = await db.collection('bbsItems').where('status', '==', 'pending').get()
+  const items = snap.docs.map((d) => parseBbsItem(d.id, d.data()))
+  const due = bbsEndingPushes(items, bbsYmd(new Date()))
+  if (due.length === 0) return
+  const prefs = await loadBbsPrefs()
+  for (const { id, step, pushes } of due) {
+    await Promise.all(pushes.filter((p) => prefs[p.to].ending).map(sendBbs))
+    await db.doc(`bbsItems/${id}`).update({ endingSent: FieldValue.arrayUnion(step) })
+  }
+})
+
+/** Quién llama, de los tres (o null). */
+function bbsPersonOf(auth: { token: { email?: string; email_verified?: boolean } } | undefined): BbsPerson | null {
+  const email = (auth?.token.email ?? '').toLowerCase()
+  if (!email || auth?.token.email_verified !== true) return null
+  const emails: Record<BbsPerson, string> = { nita: NITA_EMAIL.value(), kitos: KITOS_EMAIL.value(), maria: MARIA_EMAIL.value() }
+  return BBS_PEOPLE.find((p) => emails[p] && emails[p].toLowerCase() === email) ?? null
+}
+
+/** Botón "Probar" de los avisos de bbs. */
+export const bbsTestPush = onCall(async (req) => {
+  const person = bbsPersonOf(req.auth)
+  if (!person) throw new HttpsError('permission-denied', 'Esto es solo para Nita, Kitos y María.')
+  await sendBbs({ to: person, kind: 'reminder', title: '🌟 ¡Avisos de bbs activados!', body: 'Te avisaremos cuando alguien apunte algo o un plan se vaya a acabar.', tag: 'bbs-test' })
+  return { ok: true }
 })

@@ -86,3 +86,25 @@ export function SetupScreen() {
     </Shell>
   )
 }
+
+/** María entra en Nitakitos: lo suyo es bbs (aquí no ve nada de la pareja; lo garantizan las reglas de Firestore). */
+export function GoToBbsScreen({ user, bbsUrl }: { user: User; bbsUrl: string }) {
+  return (
+    <Shell>
+      <h1 className="text-2xl font-extrabold">¡Hola, María! 👋</h1>
+      <p className="mt-2 max-w-xs text-muted">
+        Esta es la app de Nita y Kitos. Los planes y sitios que compartís los tres están en <b className="text-ink">bbs</b>.
+      </p>
+      {bbsUrl ? (
+        <a href={bbsUrl} className="mt-8 flex h-14 w-full max-w-xs items-center justify-center rounded-2xl bg-[#0d9488] font-extrabold text-white shadow-lg shadow-teal-700/30 active:scale-[0.98]">
+          Ir a bbs ✨
+        </a>
+      ) : (
+        <p className="mt-6 max-w-xs text-sm text-muted">Pídele a Nita el enlace de bbs.</p>
+      )}
+      <button onClick={logout} className="mt-4 h-12 rounded-2xl px-6 text-sm font-bold text-muted">
+        Usar otra cuenta ({user.email})
+      </button>
+    </Shell>
+  )
+}

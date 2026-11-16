@@ -1,0 +1,31 @@
+/* bbs: la base de Nitakitos (Tailwind, modo oscuro, tipografía) con su propia identidad: verde azulado y fondo menta. */
+@import "../src/index.css";
+@source "../src";
+
+:root {
+  --color-cream: #f2f7f4;
+  --color-ink: #14231f;
+  --color-muted: #667b74;
+  /* Lo que en Nitakitos es morado (bordes al escribir, spinners…) aquí es el color de bbs. */
+  --color-both: #0d9488;
+  --color-both-soft: #ccfbf1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-cream: #0c1513;
+    --color-surface: #15211e;
+    --color-ink: #e6f2ee;
+    --color-muted: #93aaa2;
+    --color-both: #14b8a6;
+    --color-both-soft: #123b37;
+
+    --color-stone-50: #1a2724;
+    --color-stone-100: #22312d;
+    --color-stone-200: #2e3f3a;
+    --color-stone-300: #465a54;
+    --color-stone-400: #6b807a;
+    --color-stone-500: #8aa09a;
+    --color-stone-600: #a9bdb7;
+  }
+}

@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// 🔒 Solo vosotros dos podéis leer o escribir.
-// ⚠️ Cambia estos emails por los vuestros (los mismos que en VITE_NITA_EMAIL / VITE_KITOS_EMAIL).
+// 🔒 Solo vosotros dos podéis leer o escribir (y María, solo en lo de bbs: ver isBbs() abajo).
+// ⚠️ Cambia estos emails por los vuestros (los mismos que en VITE_NITA_EMAIL / VITE_KITOS_EMAIL / VITE_MARIA_EMAIL).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -367,6 +367,70 @@ service cloud.firestore {
     // Euríbor: lo escribe solo el servidor (Cloud Functions).
     match /rates/{docId} {
       allow read: if isCouple();
+    }
+
+    // ─── bbs: planes y sitios de Nita, Kitos y María ───────────────────────
+    // María SOLO entra aquí: todo lo de arriba sigue con isCouple(), que no la incluye.
+    function isBbs() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in [
+          'nita@gmail.com',
+          'kitos@gmail.com',
+          'maria@gmail.com'
+        ];
+    }
+
+    function bbsMe() {
+      let email = request.auth.token.email.lower();
+      return email == 'nita@gmail.com' ? 'nita' : (email == 'kitos@gmail.com' ? 'kitos' : 'maria');
+    }
+
+    function isValidBbsItem(d) {
+      return d.title is string && d.title.size() > 0 && d.title.size() <= 120
+        && d.link is string && d.link.size() <= 2000
+        && d.kind in ['restaurante', 'bar', 'ruta', 'expo', 'escapada', 'casa', 'otro']
+        && d.status in ['pending', 'done', 'dropped']
+        && d.addedBy in ['nita', 'kitos', 'maria']
+        && d.price in [0, 1, 2, 3]
+        && d.note is string && d.note.size() <= 2000
+        && d.hearts is map && d.ratings is map;
+    }
+
+    // ❤️ y "¿qué tal fue?": cada uno solo toca lo suyo.
+    function onlyMyMarks() {
+      return request.resource.data.hearts.diff(resource.data.get('hearts', {})).affectedKeys().hasOnly([bbsMe()])
+        && request.resource.data.ratings.diff(resource.data.get('ratings', {})).affectedKeys().hasOnly([bbsMe()]);
+    }
+
+    match /bbsItems/{itemId} {
+      allow read: if isBbs();
+      allow create: if isBbs()
+        && isValidBbsItem(request.resource.data)
+        && request.resource.data.addedBy == bbsMe()
+        && request.resource.data.hearts.keys().hasOnly([bbsMe()])
+        && request.resource.data.ratings.keys().size() == 0;
+      allow update: if isBbs()
+        && isValidBbsItem(request.resource.data)
+        && request.resource.data.addedBy == resource.data.addedBy
+        && onlyMyMarks();
+      // Borrar del todo, solo quien lo apuntó (los demás pueden descartarlo).
+      allow delete: if isBbs() && resource.data.addedBy == bbsMe();
+    }
+
+    // Preferencias de avisos de bbs (y lo que venga: cosas comunes de los tres).
+    match /bbsConfig/{docId} {
+      allow read, write: if isBbs();
+    }
+
+    // Móviles con avisos de bbs (id = token de FCM). Cada uno solo ve y toca los suyos.
+    match /bbsDevices/{token} {
+      allow read, delete: if isBbs() && resource.data.person == bbsMe();
+      allow create, update: if isBbs()
+        && request.resource.data.person == bbsMe()
+        && request.resource.data.token == token
+        && request.resource.data.app in ['bbs', 'nitakitos']
+        && (resource == null || resource.data.person == bbsMe());
     }
   }
 }

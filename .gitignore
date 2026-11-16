@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-bbs
 *.tsbuildinfo
 .env
 .env.local

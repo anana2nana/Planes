@@ -19,6 +19,21 @@ App web móvil privada para una pareja: **Nita** (la dueña del repo, poco técn
 - **No subas nunca sus emails reales al repo** (decisión de privacidad). Están solo en: reglas de la consola de Firebase, variables `VITE_NITA_EMAIL` / `VITE_KITOS_EMAIL` en Vercel y los parámetros `NITA_EMAIL` / `KITOS_EMAIL` de las funciones (`functions/.env.planes-5af6b`, solo en Cloud Shell).
 - `.env.production` (sí está en el repo) lleva la config web pública de Firebase y la clave VAPID pública.
 
+## bbs (segunda app del repo, nov 2026) — Nita, Kitos y María (hermana de Nita)
+
+Repositorio compartido de planes y sitios "para cuando no sabemos qué hacer". Mismo Firebase (Auth, Firestore), **otra URL de Vercel** (otro proyecto) con su nombre, icono, manifest y service worker.
+- **Build aparte**: `vite.bbs.config.ts` (root `bbs/`, `publicDir` `bbs/public`, `envDir` la raíz, salida `dist-bbs/`). `npm run dev:bbs` (puerto 5174) · `npm run build:bbs`. Vercel (proyecto bbs): directorio raíz = el del repo, build `npm run build:bbs`, salida `dist-bbs`; variables `VITE_NITA_EMAIL`, `VITE_KITOS_EMAIL`, `VITE_MARIA_EMAIL` (el `vercel.json` vale para los dos). En el proyecto de Nitakitos: `VITE_MARIA_EMAIL` y `VITE_BBS_URL`.
+- `bbs/`: `index.html`, `main.tsx` (entrada), `bbs.css` (importa `src/index.css` y cambia neutros y `--color-both` a su verde azulado; `@source "../src"`), `public/` (manifest con `share_target` → `/share`, `sw.js` copia del de Nitakitos con su nombre, iconos PNG generados con Playwright). `public/bbs-icon-192.png` es su icono para la baldosa de Nitakitos.
+- **Módulo compartido `src/bbs/`** (no duplicado): `BbsView` (lo usan `BbsApp` —la app sola, con login propio— y la baldosa de **Nosotros → Con María**), `BbsForm` (apuntar en segundos: título + enlace; "Más detalles": tipo, dónde con `PlaceField`, precio, interior/exterior, reservar, fechas un día/temporada/hasta, nota; un enlace pegado en el título se mueve solo), `BbsPicker` ("No sabemos qué hacer": capa `useLayer('bbsPick')`, filtros hoy/cerca 5 km/barato/si llueve/tipo, sorteo con peso), `BbsNotifications`, `Hearts`, `useBbs` (escrituras sin esperar), `push.ts`, `people.ts` (`bbsPersonFromEmail`, `isMariaEmail`, `BBS_URL`, colores: Nita rosa, Kitos azul, María ámbar). Colores `bbs`, `bbs-soft`, `bbs-ink` en `@theme` de `src/index.css`.
+- **Lógica pura** `src/lib/bbs.ts` (testeada en `tests/bbs.test.ts`; **copia idéntica en `functions/src/bbs.ts`**): fechas (`dateState`, `urgencyText`), ❤️ (`heartsText`), `verdict`, `sortPending` (primero lo que acaba en ≤ 7 días, luego más ❤️), `matches` (filtros), `weight` (1/3/5/9 papeletas según ❤️, ×1,5 si acaba en una semana), `pickWeighted` (no repite el anterior), `guessKind`, `cleanLink` (quita utm/igsh…), `addedPushes`, `endingPushes` (7, 2 y 0 días; lo de un solo día avisa 7 y 2 días antes), `parseBbsItem`.
+- **Datos**: `bbsItems` (title, link, kind restaurante/bar/ruta/expo/escapada/casa/otro, place, price 0-3, setting in/out/both, booking, note, addedBy, status pending/done/dropped, `hearts {persona: true}`, `ratings {persona: again/good/meh}`, from/to "yyyy-mm-dd", doneAt, `endingSent` lo escribe el servidor), `bbsConfig/notifications` ({persona: {added, ending}}), `bbsDevices/{token}` (person, app bbs|nitakitos: en Nitakitos el aviso abre `/?bbs=1` → la baldosa).
+- **Reglas**: `isBbs()` (los 3 emails) y `bbsMe()` SOLO en `bbsItems`, `bbsConfig`, `bbsDevices`; el resto sigue con `isCouple()`, que no incluye a María (comprobado con el emulador: no lee ni escribe plans, config, devices, shopping, gifts…). Cada uno solo cambia su ❤️ y su valoración (`diff().affectedKeys().hasOnly([bbsMe()])`), crea con `addedBy == bbsMe()`, borra solo lo suyo; `bbsDevices` solo los tuyos. `me()` de la pareja devuelve 'kitos' para cualquier email que no sea el de Nita, pero siempre va detrás de `isCouple()`.
+- **Funciones**: `onBbsItemCreated` (avisa a los otros dos), `bbsEndingSoon` (10:10), `bbsTestPush` (onCall; usa el parámetro `MARIA_EMAIL`, por defecto vacío). `sendBbs` lee `bbsDevices` (no `devices`). Sin índices nuevos.
+- En Nitakitos, si entra María (`VITE_MARIA_EMAIL`), ve `GoToBbsScreen` con el enlace a bbs.
+- Google Maps: la clave está restringida por dominio: hay que **añadir el dominio de bbs** en Google Cloud → Credenciales (si no, "Dónde" funciona solo como texto y no hay botón Ir ni "Cerca"). En local, la clave no funciona en el puerto 5174.
+- Fuera de la v1 (preparado): fotos (irían en `bbsPhotos/{id}` como `recipePhotos`), chat, mapa general (los sitios ya guardan lat/lng; `SpotsMap` sirve de modelo), sugerencias con IA.
+- E2E: `bbs.mjs` en el scratchpad (para importar módulos en el dev server de bbs, buscar la URL con `performance.getEntriesByType('resource')`, que van por `/@fs/…`).
+
 ## Stack y estructura
 
 Vite + React 19 + TypeScript + Tailwind v4 (`@tailwindcss/vite`) + Firebase 12 (Auth con Google, Firestore en tiempo real con caché persistente, Cloud Messaging) · Cloud Functions v2 (Node 22).
@@ -127,7 +142,7 @@ Un documento por elemento, con `kind`: `event` (cita: no se completa), `plan` (o
 
 ## Ideas pendientes
 
-Hechas: Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario, compartir, regalos, reparto, notas, menú y recetas, diario, nutrición, salud, hemeroteca, sitios, papeles, viajes, hitos, banda sonora, cápsula, mantenimiento, coche, suscripciones, médico, rutas, reto de tareas, muebles y deco.
+Hechas: bbs (app con María), Google Calendar, Algún día, presupuestos y tickets, gata, modo oscuro, aniversario, compartir, regalos, reparto, notas, menú y recetas, diario, nutrición, salud, hemeroteca, sitios, papeles, viajes, hitos, banda sonora, cápsula, mantenimiento, coche, suscripciones, médico, rutas, reto de tareas, muebles y deco.
 
 - Descartado: gastos compartidos tipo Splitwise (no hacen cuentas).
 - Hechos (oct 2026): **Salud** (entrenos por grupos, peso y medidas) y **Nutrición aproximada** (colores por plato). Google Fit no: sus APIs cierran y Health Connect no funciona en webs. Posibles mejoras: avisos push de "hoy toca", entrenos en el resumen de la mañana.

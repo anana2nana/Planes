@@ -22,10 +22,13 @@ import { Cover, MediaView } from '../media/MediaView'
 import { useMedia } from '../../hooks/useMedia'
 import { MEDIA_KINDS, sortMedia } from '../../lib/media'
 import { AreaTitle, Tile } from '../hub/Tile'
+import { BbsView } from '../../bbs/BbsView'
+import { useBbsItems } from '../../bbs/useBbs'
+import { dateState, heartCount, ymdOf } from '../../lib/bbs'
 import type { AreaTitleInfo } from './types'
 
-export type NosotrosSection = 'diario' | 'ideas' | 'regalos' | 'hemeroteca' | 'sitios' | 'viajes' | 'musica' | 'hitos' | 'capsula'
-const TITLE: Record<NosotrosSection, string> = { diario: 'Diario', ideas: 'Algún día', regalos: 'Regalos', hemeroteca: 'Hemeroteca', sitios: 'Sitios', viajes: 'Viajes', musica: 'Banda sonora', hitos: 'Vuestra historia', capsula: 'Cápsula del tiempo' }
+export type NosotrosSection = 'bbs' | 'diario' | 'ideas' | 'regalos' | 'hemeroteca' | 'sitios' | 'viajes' | 'musica' | 'hitos' | 'capsula'
+const TITLE: Record<NosotrosSection, string> = { bbs: 'bbs', diario: 'Diario', ideas: 'Algún día', regalos: 'Regalos', hemeroteca: 'Hemeroteca', sitios: 'Sitios', viajes: 'Viajes', musica: 'Banda sonora', hitos: 'Vuestra historia', capsula: 'Cápsula del tiempo' }
 
 /** Nosotros: el tiempo juntos, el diario, las ideas de planes y los regalos. */
 export function NosotrosView({
@@ -54,6 +57,7 @@ export function NosotrosView({
     onTitle(section ? { title: TITLE[section], crumb: 'Nosotros' } : null)
   }, [section, onTitle])
 
+  if (section === 'bbs') return <BbsView me={me} app="nitakitos" onError={onError} />
   if (section === 'diario') return <DiaryView me={me} onError={onError} />
   if (section === 'ideas') return <IdeasView me={me} onMakePlan={onMakePlan} onPlan={onPlan} onGo={open} onError={onError} />
   if (section === 'regalos') return <GiftsView me={me} onError={onError} />
@@ -91,6 +95,11 @@ function NosotrosHub({ me, onOpen, onError }: { me: PersonId; onOpen: (s: Nosotr
   const { items: capsules } = useCapsules()
   const toOpen = capsules.filter((c) => c.from !== me && (c.to === me || c.to === 'both') && capsuleState(c.openAt, now).open && !c.openedAt).length
   const sealed = capsules.filter((c) => !capsuleState(c.openAt, now).open).length
+  const { items: bbsItems } = useBbsItems()
+  const bbsToday = ymdOf(now)
+  const bbsOpen = bbsItems.filter((i) => i.status === 'pending' && dateState(i, bbsToday) !== 'over')
+  const bbsPending = bbsOpen.length
+  const bbsAllThree = bbsOpen.filter((i) => heartCount(i) === 3).length
   const covers = [...doing, ...sortMedia(media, 'done')].filter((m) => m.cover).slice(0, 4)
 
   return (
@@ -183,6 +192,25 @@ function NosotrosHub({ me, onOpen, onError }: { me: PersonId; onOpen: (s: Nosotr
             )}
           </Tile>
         </div>
+      </section>
+
+      <section>
+        <AreaTitle>Con María</AreaTitle>
+        <button
+          onClick={() => onOpen('bbs')}
+          className="flex w-full items-center gap-3 rounded-3xl bg-gradient-to-br from-[#0f766e] via-[#0d9488] to-[#2dd4bf] p-4 text-left text-white shadow-lg shadow-teal-700/20 active:scale-[0.99]"
+        >
+          <img src="/bbs-icon-192.png" alt="" className="size-12 shrink-0 rounded-2xl shadow-sm" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold">bbs</span>
+            <span className="block text-xs font-semibold opacity-95">
+              {bbsPending === 0 ? 'Planes y sitios de los tres · 🎲 no sabemos qué hacer' : `${bbsPending} ${bbsPending === 1 ? 'plan pendiente' : 'planes pendientes'}${bbsAllThree ? ` · ❤️ ${bbsAllThree} a los tres` : ''}`}
+            </span>
+          </span>
+          <span aria-hidden className="text-2xl">
+            🎲
+          </span>
+        </button>
       </section>
 
       <section>

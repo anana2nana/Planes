@@ -16,6 +16,11 @@
   --color-both: #8b5cf6;
   --color-both-soft: #ede9fe;
 
+  /* bbs (planes con María): su color propio, también dentro de Nitakitos. */
+  --color-bbs: #0d9488;
+  --color-bbs-soft: #ccfbf1;
+  --color-bbs-ink: #0f5f58;
+
   --animate-sheet-in: sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-in: fade-in 200ms ease-out;
   --animate-pop: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -55,6 +60,8 @@
     --color-nita-soft: #4a1d2a;
     --color-kitos-soft: #0f3346;
     --color-both-soft: #2f2350;
+    --color-bbs-soft: #123b37;
+    --color-bbs-ink: #7fe0d4;
 
     --color-stone-50: #2a2330;
     --color-stone-100: #332b3a;
